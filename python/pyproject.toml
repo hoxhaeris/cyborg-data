@@ -97,8 +97,11 @@ exclude = ["orgdatacore/_internal/testing", "examples"]
 extraPaths = ["."]
 reportMissingTypeStubs = false
 
-# Test-specific overrides (tests often need to access internals)
+# Test-specific overrides (tests use pytest which lacks type stubs)
 [[tool.pyright.executionEnvironments]]
 root = "tests"
 reportPrivateUsage = false
+reportMissingImports = false
+reportUnknownMemberType = false
+reportUntypedFunctionDecorator = false
 

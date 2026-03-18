@@ -154,6 +154,31 @@ class _AnonymizationEngine:
             if github_id in self._github_id_to_nonce:
                 uid_to_github_nonce[uid] = self._github_id_to_nonce[github_id]
 
+        # Phase 2b: Generate nonces for UIDs found in group people/role
+        # lists that aren't in the employee directory (e.g. external
+        # contributors or kerberos IDs without employee records).
+        all_groups = [
+            *(t.group for t in data.lookups.teams.values()),
+            *(o.group for o in data.lookups.orgs.values()),
+            *(p.group for p in data.lookups.pillars.values()),
+            *(tg.group for tg in data.lookups.team_groups.values()),
+        ]
+        for group in all_groups:
+            for uid in group.resolved_people_uid_list:
+                if uid and uid not in self._uid_to_nonce:
+                    nonce = self._generate_nonce("HUMAN-", used_nonces)
+                    self._uid_to_nonce[uid] = nonce
+                    self._nonce_to_uid[nonce] = uid
+                    self._nonce_to_display[nonce] = nonce
+            if group.roles:
+                for role in group.roles:
+                    for uid in role.people:
+                        if uid and uid not in self._uid_to_nonce:
+                            nonce = self._generate_nonce("HUMAN-", used_nonces)
+                            self._uid_to_nonce[uid] = nonce
+                            self._nonce_to_uid[nonce] = uid
+                            self._nonce_to_display[nonce] = nonce
+
         # Phase 3: Rewrite employee records
         new_employees: dict[str, Employee] = {}
         for uid, emp in employees.items():

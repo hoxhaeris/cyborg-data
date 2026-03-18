@@ -348,6 +348,34 @@ class TestAnonymizingDataSourceGroups:
         for person in roles[0]["people"]:
             assert NONCE_PATTERN.match(person)
 
+    def test_roles_people_not_in_employees_get_nonces(self, sample_data: dict) -> None:
+        """UIDs in role people lists that aren't employees must still be anonymized."""
+        # Add a role with a UID that has no employee record
+        sample_data["lookups"]["teams"]["test-squad"]["group"]["resolved_roles"].append(
+            {"people": ["extuser1", "extuser2"], "roles": ["docs_writer"]},
+        )
+        inner = FakeDataSource(sample_data)
+        source = AnonymizingDataSource(inner, PIIMode.ANONYMIZED)
+
+        result = json.load(source.load())
+
+        roles = result["lookups"]["teams"]["test-squad"]["group"]["resolved_roles"]
+        docs_role = [r for r in roles if "docs_writer" in r["roles"]][0]
+        for person in docs_role["people"]:
+            assert NONCE_PATTERN.match(person), f"Raw UID leaked: {person}"
+
+    def test_group_people_not_in_employees_get_nonces(self, sample_data: dict) -> None:
+        """UIDs in resolved_people_uid_list that aren't employees must still be anonymized."""
+        sample_data["lookups"]["teams"]["test-squad"]["group"]["resolved_people_uid_list"].append("extuser1")
+        inner = FakeDataSource(sample_data)
+        source = AnonymizingDataSource(inner, PIIMode.ANONYMIZED)
+
+        result = json.load(source.load())
+
+        people = result["lookups"]["teams"]["test-squad"]["group"]["resolved_people_uid_list"]
+        for person in people:
+            assert NONCE_PATTERN.match(person), f"Raw UID leaked: {person}"
+
 
 class TestAnonymizingDataSourceLookupAPI:
     """Tests for the resolution/lookup API."""
@@ -480,14 +508,42 @@ class TestAnonymizingDataSourceNonceStability:
         old_nonce = source.anonymize_uid("jsmith")
         assert old_nonce is not None
 
-        # Remove jsmith
+        # Remove jsmith from employees, indexes, and all group people lists
         del sample_data["lookups"]["employees"]["jsmith"]
-        # Also clean up indexes
         sample_data["indexes"]["membership"]["membership_index"].pop("jsmith", None)
+        for entity_type in ("teams", "orgs", "pillars", "team_groups"):
+            for entity in sample_data["lookups"].get(entity_type, {}).values():
+                grp = entity.get("group", {})
+                people = grp.get("resolved_people_uid_list", [])
+                if "jsmith" in people:
+                    grp["resolved_people_uid_list"] = [u for u in people if u != "jsmith"]
+                for role in grp.get("resolved_roles", []):
+                    rp = role.get("people", [])
+                    if "jsmith" in rp:
+                        role["people"] = [u for u in rp if u != "jsmith"]
 
         source.load()
         assert source.anonymize_uid("jsmith") is None
         assert source.resolve(old_nonce) is None
+
+    def test_removed_employee_still_in_group_gets_nonce(self, sample_data: dict) -> None:
+        """UIDs removed from employees but still in group lists must still be anonymized."""
+        inner = FakeDataSource(sample_data)
+        source = AnonymizingDataSource(inner, PIIMode.ANONYMIZED)
+
+        source.load()
+        old_nonce = source.anonymize_uid("jsmith")
+        assert old_nonce is not None
+
+        # Remove jsmith from employees but leave in group people lists
+        del sample_data["lookups"]["employees"]["jsmith"]
+        sample_data["indexes"]["membership"]["membership_index"].pop("jsmith", None)
+
+        source.load()
+        # UID still referenced in groups — must get a nonce (not leak raw UID)
+        new_nonce = source.anonymize_uid("jsmith")
+        assert new_nonce is not None
+        assert new_nonce.startswith("HUMAN-")
 
 
 class TestAnonymizingDataSourceStr:

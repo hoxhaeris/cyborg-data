@@ -38,6 +38,7 @@ from ._exceptions import (
     DataSourceError,
     GCSError,
     OrgDataError,
+    ReadOnlyViewError,
     TimeTravelNotSupportedError,
     VersionNotAvailableError,
 )
@@ -157,6 +158,7 @@ __all__ = [
     "ConfigurationError",
     "TimeTravelNotSupportedError",
     "VersionNotAvailableError",
+    "ReadOnlyViewError",
     "get_logger",
     "set_logger",
     "configure_default_logging",

@@ -100,3 +100,15 @@ class VersionNotAvailableError(OrgDataError):
     """
 
     pass
+
+
+class ReadOnlyViewError(OrgDataError):
+    """A mutating method was called on a read-only historical view.
+
+    Raised by load_from_data_source / start_data_source_watcher on a Service (or
+    AsyncService) returned by as_of. Such a view is shared across callers and
+    bound to an immutable snapshot, so reloading or watching it is refused
+    rather than silently corrupting the cached snapshot.
+    """
+
+    pass

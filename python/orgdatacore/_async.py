@@ -30,6 +30,7 @@ from ._exceptions import (
     ConfigurationError,
     DataLoadError,
     GCSError,
+    ReadOnlyViewError,
     TimeTravelNotSupportedError,
     VersionNotAvailableError,
 )
@@ -38,6 +39,7 @@ from ._service import (
     DEFAULT_HISTORY_CACHE_SIZE,
     DEFAULT_VERSIONS_CACHE_TTL,
     _ancestor_org_info_type,
+    _as_utc,
     _EntityRef,
     _NameTypeKey,
     _normalize_slack_channel,
@@ -114,6 +116,10 @@ class AsyncService:
         self._version = DataVersion()
         self._init_source = data_source
         self._watcher_running = False
+        # Marks a historical snapshot returned by as_of. Such a view is shared
+        # across callers and bound to an immutable version, so its mutating
+        # methods refuse to run. Set once when the view is built.
+        self._read_only = False
         self._watcher_task: asyncio.Task[None] | None = None
         self._watcher_source: Any | None = None
         self._slack_channel_index: dict[str, list[str]] = {}
@@ -151,7 +157,12 @@ class AsyncService:
 
         Raises:
             DataLoadError: If loading or parsing fails.
+            ReadOnlyViewError: If called on a historical view returned by as_of.
         """
+        if self._read_only:
+            raise ReadOnlyViewError(
+                "cannot load data into a read-only historical view"
+            )
         logger = get_logger()
         logger.debug("Loading data from async source", extra={"source": str(source)})
 
@@ -274,13 +285,24 @@ class AsyncService:
         if cached is not None:
             return cached
 
-        if inspect.iscoroutinefunction(source.load_version):
-            reader = await source.load_version(ref)
-        else:
-            reader = await asyncio.to_thread(source.load_version, ref)
+        try:
+            if inspect.iscoroutinefunction(source.load_version):
+                reader = await source.load_version(ref)
+            else:
+                reader = await asyncio.to_thread(source.load_version, ref)
+        except VersionNotAvailableError:
+            # The resolved version was pruned between listing and read.
+            raise
+        except Exception as e:
+            raise DataLoadError(
+                f"failed to load version {ref.id} from {source}: {e}"
+            ) from e
 
         view = AsyncService()
         await view._apply_reader(reader, cache_key)
+        # Bind the view to its snapshot: it is shared across cache hits, so its
+        # mutating methods must refuse to reload or watch.
+        view._read_only = True
         self._put_cached_view(cache_key, view)
         return view
 
@@ -294,7 +316,10 @@ class AsyncService:
             if entry is not None and (time.monotonic() - entry[0]) < self._versions_ttl:
                 return entry[1]
         refs = await self._call_list_versions(source)
-        refs = sorted(refs, key=lambda r: r.created)
+        # Normalize to UTC in the sort key so a source returning mixed
+        # naive/aware created times does not raise TypeError (matches
+        # _resolve_version, which compares via _as_utc).
+        refs = sorted(refs, key=lambda r: _as_utc(r.created))
         if self._versions_ttl > 0:
             self._versions_cache[key] = (time.monotonic(), refs)
         return refs
@@ -339,7 +364,12 @@ class AsyncService:
         Raises:
             DataLoadError: If initial load fails.
             RuntimeError: If watcher is already running.
+            ReadOnlyViewError: If called on a historical view returned by as_of.
         """
+        if self._read_only:
+            raise ReadOnlyViewError(
+                "cannot start a watcher on a read-only historical view"
+            )
         logger = get_logger()
 
         if self._watcher_running:

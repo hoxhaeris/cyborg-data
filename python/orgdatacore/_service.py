@@ -9,6 +9,7 @@ from typing import Any, BinaryIO, NamedTuple, cast
 
 from ._exceptions import (
     DataLoadError,
+    ReadOnlyViewError,
     TimeTravelNotSupportedError,
     VersionNotAvailableError,
 )
@@ -320,6 +321,11 @@ class Service:
         self._stop_event = threading.Event()
         self._slack_channel_index: dict[str, list[str]] = {}
 
+        # Marks a historical snapshot returned by as_of. Such a view is shared
+        # across callers and bound to an immutable version, so its mutating
+        # methods refuse to run. Set once when the view is built.
+        self._read_only = False
+
         # Historical snapshot cache for as_of, keyed by "source@version_id" (LRU).
         # The source is part of the key so snapshots from a raw source and from a
         # wrapper (e.g. redacting) over it never collide.
@@ -351,7 +357,12 @@ class Service:
 
         Raises:
             DataLoadError: If loading or parsing fails.
+            ReadOnlyViewError: If called on a historical view returned by as_of.
         """
+        if self._read_only:
+            raise ReadOnlyViewError(
+                "cannot load data into a read-only historical view"
+            )
         logger = get_logger()
         logger.debug("Loading data from source", extra={"source": str(source)})
 
@@ -537,7 +548,12 @@ class Service:
         Raises:
             DataLoadError: If initial load fails.
             RuntimeError: If watcher is already running.
+            ReadOnlyViewError: If called on a historical view returned by as_of.
         """
+        if self._read_only:
+            raise ReadOnlyViewError(
+                "cannot start a watcher on a read-only historical view"
+            )
         logger = get_logger()
 
         if self._watcher_running:
@@ -657,7 +673,10 @@ class Service:
             raise
         except Exception as e:
             raise DataLoadError(f"failed to list versions from {source}: {e}") from e
-        refs = sorted(refs, key=lambda r: r.created)
+        # Normalize to UTC in the sort key so a source returning mixed
+        # naive/aware created times does not raise TypeError (matches
+        # _resolve_version, which compares via _as_utc).
+        refs = sorted(refs, key=lambda r: _as_utc(r.created))
         if self._versions_ttl > 0:
             with self._versions_lock:
                 self._versions_cache[key] = (time.monotonic(), refs)
@@ -718,6 +737,9 @@ class Service:
 
         view = Service()
         view._load_reader(reader, cache_key)
+        # Bind the view to its snapshot: it is shared across cache hits, so its
+        # mutating methods must refuse to reload or watch.
+        view._read_only = True
         self._put_cached_view(cache_key, view)
         return view
 

@@ -37,6 +37,12 @@ type Service struct {
 	watcherCancel     context.CancelFunc
 	slackChannelIndex map[string][]string
 
+	// readOnly marks a historical snapshot returned by AsOf. Such a view is
+	// shared across callers and bound to an immutable version, so its mutating
+	// methods refuse to run. Set once when the view is built, before it is
+	// published, and never changed afterwards.
+	readOnly bool
+
 	// Derived identity indexes, rebuilt on every load. Populated only when the
 	// index carries stable IDs (useStableIDs); otherwise traversal falls back
 	// to the legacy name+type behavior.
@@ -80,6 +86,9 @@ func NewService(opts ...ServiceOption) *Service {
 }
 
 func (s *Service) LoadFromDataSource(ctx context.Context, source DataSource) error {
+	if s.readOnly {
+		return ErrReadOnlyView
+	}
 	reader, err := source.Load(ctx)
 	if err != nil {
 		return NewLoadError(source.String(), err)
@@ -212,6 +221,9 @@ func (s *Service) buildDerivedIndexes() {
 }
 
 func (s *Service) StartDataSourceWatcher(ctx context.Context, source DataSource) error {
+	if s.readOnly {
+		return ErrReadOnlyView
+	}
 	s.mu.Lock()
 	if s.watcherRunning {
 		s.mu.Unlock()

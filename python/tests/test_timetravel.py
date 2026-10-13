@@ -7,13 +7,15 @@ import pytest
 from orgdatacore import (
     AnonymizingDataSource,
     AsyncService,
+    DataLoadError,
+    ReadOnlyViewError,
     RedactingDataSource,
     Service,
     TimeTravelNotSupportedError,
     VersionNotAvailableError,
 )
 from orgdatacore._internal.testing import FakeGCSDataSource
-from orgdatacore._types import PIIMode
+from orgdatacore._types import DataVersionRef, PIIMode
 
 
 def _version_json(data_version: str, emp_uid: str) -> str:
@@ -281,3 +283,111 @@ class TestAsyncAsOf:
         first = await svc.as_of(history, t0 + timedelta(hours=12))
         second = await svc.as_of(history, t0 + timedelta(hours=6))
         assert first is second
+
+
+class _MixedTZHistory:
+    """Historical source whose refs mix naive and tz-aware created times."""
+
+    def __init__(self, t0: datetime) -> None:
+        self._t0 = t0
+
+    def load(self):  # type: ignore[no-untyped-def]
+        from io import BytesIO
+
+        return BytesIO(_version_json("v1", "emp1").encode())
+
+    def watch(self, callback):  # type: ignore[no-untyped-def]
+        return None
+
+    def __str__(self) -> str:
+        return "mixed-tz"
+
+    def list_versions(self) -> list[DataVersionRef]:
+        # One naive (DataVersionRef default is datetime.min, naive) and one aware.
+        return [
+            DataVersionRef(id="1"),  # naive datetime.min
+            DataVersionRef(id="2", created=self._t0.replace(tzinfo=UTC)),
+        ]
+
+    def load_version(self, ref: DataVersionRef) -> object:
+        from io import BytesIO
+
+        return BytesIO(_version_json("v1", "emp1").encode())
+
+
+class _LoadVersionFails:
+    """Historical source whose load_version raises a generic (non-version) error."""
+
+    def __init__(self, t0: datetime) -> None:
+        self._t0 = t0
+
+    def load(self):  # type: ignore[no-untyped-def]
+        from io import BytesIO
+
+        return BytesIO(_version_json("v1", "emp1").encode())
+
+    def watch(self, callback):  # type: ignore[no-untyped-def]
+        return None
+
+    def __str__(self) -> str:
+        return "load-fails"
+
+    def list_versions(self) -> list[DataVersionRef]:
+        return [DataVersionRef(id="1", created=self._t0)]
+
+    def load_version(self, ref: DataVersionRef) -> object:
+        raise RuntimeError("transient read failure")
+
+
+class TestReadOnlyView:
+    """A historical view is shared and immutable; its mutators must refuse."""
+
+    def test_sync_load_refused(
+        self, history: FakeGCSDataSource, t0: datetime
+    ) -> None:
+        svc = Service()
+        view = svc.as_of(history, t0)
+        with pytest.raises(ReadOnlyViewError):
+            view.load_from_data_source(history)
+        with pytest.raises(ReadOnlyViewError):
+            view.start_data_source_watcher(history)
+        # Snapshot untouched by the refused mutations.
+        assert view.get_data_version() == "v1"
+
+    @pytest.mark.asyncio
+    async def test_async_load_refused(
+        self, history: FakeGCSDataSource, t0: datetime
+    ) -> None:
+        svc = AsyncService()
+        view = await svc.as_of(history, t0)
+        with pytest.raises(ReadOnlyViewError):
+            await view.load_from_data_source(history)
+        with pytest.raises(ReadOnlyViewError):
+            await view.start_data_source_watcher(history)
+        assert view.get_data_version() == "v1"
+
+
+class TestMixedTimezoneListing:
+    """list_versions must tolerate mixed naive/aware created times when sorting."""
+
+    def test_sync_does_not_raise(self, t0: datetime) -> None:
+        svc = Service()
+        refs = svc.list_versions(_MixedTZHistory(t0))
+        assert len(refs) == 2
+
+    @pytest.mark.asyncio
+    async def test_async_does_not_raise(self, t0: datetime) -> None:
+        svc = AsyncService()
+        refs = await svc.list_versions(_MixedTZHistory(t0))
+        assert len(refs) == 2
+
+
+class TestAsyncLoadVersionErrorWrapping:
+    """Async as_of must wrap generic load_version failures in DataLoadError,
+    matching the sync API's documented contract."""
+
+    @pytest.mark.asyncio
+    async def test_generic_failure_becomes_dataloaderror(self, t0: datetime) -> None:
+        svc = AsyncService()
+        with pytest.raises(DataLoadError):
+            await svc.as_of(_LoadVersionFails(t0), t0)

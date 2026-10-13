@@ -8,6 +8,7 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -316,5 +317,70 @@ func TestAsOfThroughRedactingNonHistoricalSource(t *testing.T) {
 	_, err := svc.AsOf(context.Background(), redacting, time.Now())
 	if !errors.Is(err, ErrTimeTravelNotSupported) {
 		t.Fatalf("expected ErrTimeTravelNotSupported, got %v", err)
+	}
+}
+
+func TestAsOfViewIsReadOnly(t *testing.T) {
+	// A historical view is shared across cache hits, so its mutating methods
+	// must refuse to run rather than corrupt the cached snapshot.
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	src := newHistoryFixture(t0)
+	svc := NewService()
+	ctx := context.Background()
+
+	view, err := svc.AsOf(ctx, src, t0)
+	if err != nil {
+		t.Fatalf("AsOf error: %v", err)
+	}
+	concrete, ok := view.(*Service)
+	if !ok {
+		t.Fatalf("AsOf returned %T, want *Service", view)
+	}
+
+	if err := concrete.LoadFromDataSource(ctx, src); !errors.Is(err, ErrReadOnlyView) {
+		t.Errorf("LoadFromDataSource on view: got %v, want ErrReadOnlyView", err)
+	}
+	if err := concrete.StartDataSourceWatcher(ctx, src); !errors.Is(err, ErrReadOnlyView) {
+		t.Errorf("StartDataSourceWatcher on view: got %v, want ErrReadOnlyView", err)
+	}
+
+	// The snapshot must be untouched by the refused mutations.
+	if got := view.GetDataVersion(); got != "v1" {
+		t.Errorf("view version changed to %q after refused mutation, want v1", got)
+	}
+}
+
+// loadErrHistorical returns an already-wrapped *LoadError from ListVersions, to
+// verify AsOf/ListVersions do not re-wrap it into a doubly-nested message.
+type loadErrHistorical struct {
+	historicalFake
+	err error
+}
+
+func (l loadErrHistorical) ListVersions(ctx context.Context) ([]DataVersionRef, error) {
+	return nil, l.err
+}
+
+func TestListVersionsDoesNotDoubleWrapLoadError(t *testing.T) {
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	inner := NewLoadError("gs://bucket/org.json", errors.New("failed to list object versions"))
+	src := loadErrHistorical{historicalFake: newHistoryFixture(t0), err: inner}
+	svc := NewService()
+
+	_, err := svc.ListVersions(context.Background(), src)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	// The source already wrapped in a LoadError; it must be passed through, not
+	// nested inside a second "failed to load ...:" prefix.
+	var le *LoadError
+	if !errors.As(err, &le) {
+		t.Fatalf("expected a *LoadError, got %T: %v", err, err)
+	}
+	if le.Err != inner.Err {
+		t.Errorf("error was re-wrapped: got %v, want the original inner error %v", le.Err, inner.Err)
+	}
+	if strings.Count(err.Error(), "failed to load from") > 1 {
+		t.Errorf("doubly-nested load error message: %q", err.Error())
 	}
 }

@@ -2,7 +2,9 @@ package orgdatacore
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -18,7 +20,7 @@ func (s *Service) ListVersions(ctx context.Context, source DataSource) ([]DataVe
 	}
 	refs, err := s.listVersionsCached(ctx, hist, source.String())
 	if err != nil {
-		return nil, NewLoadError(source.String(), err)
+		return nil, wrapLoadError(source.String(), err)
 	}
 	// Return a copy so callers can't mutate the cached slice.
 	out := make([]DataVersionRef, len(refs))
@@ -59,8 +61,8 @@ func (s *Service) listVersionsCached(ctx context.Context, hist HistoricalDataSou
 
 // AsOf resolves t to the index version that was live at that time, loads it, and
 // returns a read-only Service bound to that snapshot. The returned Service
-// exposes the full query API but its data never changes; watcher methods on it
-// are inert.
+// exposes the full query API but its data never changes; its mutating methods
+// (LoadFromDataSource, StartDataSourceWatcher) return ErrReadOnlyView.
 //
 // Resolution picks the newest version whose creation time is at or before t. If
 // t predates the oldest retained version, ErrVersionNotAvailable is returned. If
@@ -82,7 +84,7 @@ func (s *Service) AsOf(ctx context.Context, source DataSource, t time.Time) (Ser
 
 	refs, err := s.listVersionsCached(ctx, hist, source.String())
 	if err != nil {
-		return nil, NewLoadError(source.String(), err)
+		return nil, wrapLoadError(source.String(), err)
 	}
 
 	ref, err := resolveVersion(refs, t)
@@ -100,7 +102,7 @@ func (s *Service) AsOf(ctx context.Context, source DataSource, t time.Time) (Ser
 
 	reader, err := hist.LoadVersion(ctx, ref)
 	if err != nil {
-		return nil, NewLoadError(source.String(), err)
+		return nil, wrapLoadError(source.String(), err)
 	}
 	defer func() {
 		if closeErr := reader.Close(); closeErr != nil {
@@ -112,6 +114,9 @@ func (s *Service) AsOf(ctx context.Context, source DataSource, t time.Time) (Ser
 	if err := view.loadFromReader(reader, cacheKey); err != nil {
 		return nil, err
 	}
+	// Bind the view to its snapshot: it is shared across cache hits, so its
+	// mutating methods must refuse to reload or watch (see ErrReadOnlyView).
+	view.readOnly = true
 
 	s.putCachedView(cacheKey, view)
 	return view, nil
@@ -148,12 +153,21 @@ func resolveVersion(refs []DataVersionRef, t time.Time) (DataVersionRef, error) 
 }
 
 func sortVersionsByCreated(refs []DataVersionRef) {
-	// Insertion against Created; stable enough for small-to-moderate version lists.
-	for i := 1; i < len(refs); i++ {
-		for j := i; j > 0 && refs[j].Created.Before(refs[j-1].Created); j-- {
-			refs[j], refs[j-1] = refs[j-1], refs[j]
-		}
+	slices.SortFunc(refs, func(a, b DataVersionRef) int {
+		return a.Created.Compare(b.Created)
+	})
+}
+
+// wrapLoadError annotates err with source unless err is already a *LoadError.
+// GCS (and other) sources already wrap their failures in a LoadError, so
+// re-wrapping here would produce a doubly-nested "failed to load ...: failed to
+// load ..." message. errors.Is/As still see the sentinel either way.
+func wrapLoadError(source string, err error) error {
+	var le *LoadError
+	if errors.As(err, &le) {
+		return err
 	}
+	return NewLoadError(source, err)
 }
 
 func (s *Service) getCachedView(key string) *Service {

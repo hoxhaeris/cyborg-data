@@ -150,18 +150,11 @@ class TestReviewFixes:
     def test_version_listing_is_cached(
         self, history: FakeGCSDataSource, t0: datetime
     ) -> None:
-        calls = {"n": 0}
-        original = history.list_versions
-
-        def counting():  # type: ignore[no-untyped-def]
-            calls["n"] += 1
-            return original()
-
-        history.list_versions = counting  # type: ignore[method-assign]
+        counting = _CountingHistory(history)
         svc = Service()
-        svc.as_of(history, t0 + timedelta(hours=12))
-        svc.as_of(history, t0 + timedelta(hours=36))
-        assert calls["n"] == 1
+        svc.as_of(counting, t0 + timedelta(hours=12))
+        svc.as_of(counting, t0 + timedelta(hours=36))
+        assert counting.list_versions_calls == 1
 
     def test_anonymize_load_version_preserves_live_state(
         self, history: FakeGCSDataSource, t0: datetime
@@ -285,6 +278,34 @@ class TestAsyncAsOf:
         assert first is second
 
 
+class _CountingHistory:
+    """Historical source that counts list_versions calls, wrapping a real source.
+
+    A real fake collaborator (not a monkeypatch) so the cache behavior is driven
+    through the actual object, mirroring the Go countingHistorical fake.
+    """
+
+    def __init__(self, inner: FakeGCSDataSource) -> None:
+        self._inner = inner
+        self.list_versions_calls = 0
+
+    def load(self):  # type: ignore[no-untyped-def]
+        return self._inner.load()
+
+    def watch(self, callback):  # type: ignore[no-untyped-def]
+        return None
+
+    def __str__(self) -> str:
+        return str(self._inner)
+
+    def list_versions(self) -> list[DataVersionRef]:
+        self.list_versions_calls += 1
+        return self._inner.list_versions()
+
+    def load_version(self, ref: DataVersionRef) -> object:
+        return self._inner.load_version(ref)
+
+
 class _MixedTZHistory:
     """Historical source whose refs mix naive and tz-aware created times."""
 
@@ -391,3 +412,77 @@ class TestAsyncLoadVersionErrorWrapping:
         svc = AsyncService()
         with pytest.raises(DataLoadError):
             await svc.as_of(_LoadVersionFails(t0), t0)
+
+
+class TestAsyncWrapperTimeTravel:
+    """Time travel must work through the async redaction/anonymization wrappers,
+    as the sync wrappers already do."""
+
+    @pytest.mark.asyncio
+    async def test_through_async_redacting_wrapper(
+        self, history: FakeGCSDataSource, t0: datetime
+    ) -> None:
+        from orgdatacore import AsyncRedactingDataSource
+
+        wrapped = AsyncRedactingDataSource(history, PIIMode.REDACTED)
+        svc = AsyncService()
+
+        refs = await svc.list_versions(wrapped)
+        assert len(refs) == 3
+
+        view = await svc.as_of(wrapped, t0)
+        emp = await view.get_employee_by_uid("emp1")
+        assert emp is not None
+        assert emp.full_name == "[REDACTED]"
+
+    @pytest.mark.asyncio
+    async def test_through_async_anonymizing_wrapper(
+        self, history: FakeGCSDataSource, t0: datetime
+    ) -> None:
+        from orgdatacore import AsyncAnonymizingDataSource
+
+        wrapped = AsyncAnonymizingDataSource(history, PIIMode.ANONYMIZED)
+        svc = AsyncService()
+
+        refs = await svc.list_versions(wrapped)
+        assert len(refs) == 3
+
+        # Resolves and loads the snapshot (uids are anonymized to nonces, so we
+        # assert on the resolved producer version rather than a known uid).
+        view = await svc.as_of(wrapped, t0)
+        assert view.get_data_version() == "v1"
+
+
+class TestAsyncValidation:
+    """Async load/as_of must enforce the same structural invariants as sync/Go."""
+
+    @pytest.mark.asyncio
+    async def test_async_rejects_pii_free_with_employees(self, t0: datetime) -> None:
+        # pii_free set but employees populated -> invalid; sync and Go reject it.
+        bad = (
+            '{"metadata": {"generated_at": "v1", "data_version": "v1", '
+            '"pii_free": true},'
+            '"lookups": {"employees": {"emp1": {"uid": "emp1", '
+            '"full_name": "User", "email": "u@test.com", "job_title": "Dev"}},'
+            '"teams": {}, "orgs": {}},'
+            '"indexes": {'
+            '"membership": {"membership_index": {}, "relationship_index": {}},'
+            '"slack_id_mappings": {"slack_uid_to_uid": {}},'
+            '"github_id_mappings": {"github_id_to_uid": {}}}}'
+        )
+
+        class _BadSource:
+            def load(self):  # type: ignore[no-untyped-def]
+                from io import BytesIO
+
+                return BytesIO(bad.encode())
+
+            def watch(self, callback):  # type: ignore[no-untyped-def]
+                return None
+
+            def __str__(self) -> str:
+                return "bad"
+
+        svc = AsyncService()
+        with pytest.raises(DataLoadError):
+            await svc.load_from_data_source(_BadSource())

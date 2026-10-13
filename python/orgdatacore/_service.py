@@ -205,12 +205,25 @@ def parse_data(raw_data: dict[str, Any]) -> Data:
 
 
 def _as_utc(d: datetime) -> datetime:
-    """Normalize a datetime to UTC, treating naive datetimes as UTC.
+    """Normalize a datetime to UTC.
 
-    GCS version timestamps are timezone-aware (UTC) while callers often pass a
-    naive ``datetime.now()``; comparing the two directly raises TypeError.
+    Timezone-aware datetimes are converted. Naive datetimes are interpreted as
+    system local time -- matching ``datetime.now()``, which callers are told to
+    pass -- and then converted, so an ``as_of`` request resolves to the correct
+    absolute instant regardless of the host timezone (matching Go's absolute
+    ``time.Now()``). GCS version timestamps are timezone-aware (UTC); comparing
+    them against a naive request directly would raise TypeError.
+
+    The ``datetime.min``/``datetime.max`` sentinels (e.g. ``DataVersionRef``'s
+    default ``created``) are stamped as UTC rather than converted, since shifting
+    them by a local offset would overflow the representable range.
     """
-    return d.replace(tzinfo=UTC) if d.tzinfo is None else d.astimezone(UTC)
+    if d.tzinfo is not None:
+        return d.astimezone(UTC)
+    try:
+        return d.astimezone(UTC)
+    except (OverflowError, OSError, ValueError):
+        return d.replace(tzinfo=UTC)
 
 
 def _resolve_version(refs: list[DataVersionRef], t: datetime) -> DataVersionRef:

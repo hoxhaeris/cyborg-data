@@ -16,6 +16,10 @@ import (
 	"google.golang.org/api/option"
 )
 
+// Compile-time assertion that the real GCS source satisfies HistoricalDataSource.
+// Guards against signature drift on ListVersions/LoadVersion behind -tags gcs.
+var _ HistoricalDataSource = (*GCSDataSourceImpl)(nil)
+
 type GCSDataSourceImpl struct {
 	bucket      string
 	objectPath  string

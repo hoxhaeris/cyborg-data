@@ -27,6 +27,9 @@ type RedactingDataSource struct {
 	piiMode PIIMode
 }
 
+// Compile-time assertion that the wrapper forwards history.
+var _ HistoricalDataSource = (*RedactingDataSource)(nil)
+
 // NewRedactingDataSource wraps a DataSource with PII redaction.
 // Defaults to PIIModeFull (no redaction) if piiMode is empty.
 func NewRedactingDataSource(source DataSource, piiMode PIIMode) *RedactingDataSource {
@@ -96,7 +99,12 @@ func (r *RedactingDataSource) Watch(ctx context.Context, callback func() error) 
 }
 
 func (r *RedactingDataSource) String() string {
-	if r.piiMode == PIIModeRedacted {
+	// transform redacts for any non-Full mode, so the description (which keys the
+	// AsOf snapshot/version caches) must reflect redaction for any non-Full mode
+	// too -- otherwise a non-Full-but-non-Redacted mode would share a cache key
+	// with the raw source and could serve an unredacted snapshot to a caller that
+	// asked for redaction.
+	if r.piiMode != PIIModeFull {
 		return fmt.Sprintf("%s [PII redacted]", r.source)
 	}
 	return r.source.String()

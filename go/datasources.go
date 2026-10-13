@@ -11,6 +11,9 @@ type GCSDataSource struct {
 	Config GCSConfig
 }
 
+// Compile-time assertion that the GCS source satisfies HistoricalDataSource.
+var _ HistoricalDataSource = (*GCSDataSource)(nil)
+
 func NewGCSDataSource(config GCSConfig) *GCSDataSource {
 	return &GCSDataSource{Config: config}
 }

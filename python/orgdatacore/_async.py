@@ -45,6 +45,7 @@ from ._service import (
     _normalize_slack_channel,
     _resolve_version,
     _to_entity_type,
+    _validate_data,
     parse_data,
 )
 from ._types import (
@@ -217,6 +218,9 @@ class AsyncService:
             raise DataLoadError(
                 f"failed to parse data structure from source {source_desc}: {e}"
             ) from e
+
+        # Enforce the same structural invariants as the sync and Go loaders.
+        _validate_data(org_data, source_desc)
 
         async with self._lock:
             self._data = org_data

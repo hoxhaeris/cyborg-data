@@ -46,6 +46,9 @@ type AnonymizingDataSource struct {
 	githubIDToNonce  map[string]string
 }
 
+// Compile-time assertion that the wrapper forwards history.
+var _ HistoricalDataSource = (*AnonymizingDataSource)(nil)
+
 // NewAnonymizingDataSource wraps a DataSource with PII anonymization.
 // Defaults to PIIModeFull (no anonymization) if piiMode is empty.
 func NewAnonymizingDataSource(source DataSource, piiMode PIIMode) *AnonymizingDataSource {

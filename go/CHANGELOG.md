@@ -28,6 +28,17 @@ and this package follows [Semantic Versioning](https://semver.org/).
 - Errors: `ErrTimeTravelNotSupported`, `ErrVersionNotAvailable`, and
   `ErrReadOnlyView`.
 
+### Fixed
+
+- Version listings are sorted stably and copied before sorting, so versions
+  sharing a `Created` timestamp resolve deterministically (matching Python) and
+  a source-owned slice is never mutated.
+- `RedactingDataSource.String()` reflects redaction for any non-`PIIModeFull`
+  mode, so the `AsOf` snapshot/version caches can never serve an unredacted
+  snapshot to a caller that asked for redaction.
+- Added compile-time `HistoricalDataSource` assertions for the GCS sources and
+  the redaction/anonymization wrappers to catch signature drift at build time.
+
 ### Notes
 
 - **Read-only snapshots.** A `Service` returned by `AsOf` is bound to an

@@ -320,6 +320,60 @@ func TestAsOfThroughRedactingNonHistoricalSource(t *testing.T) {
 	}
 }
 
+// fixedHistorical returns a caller-owned, unsorted version slice verbatim, to
+// verify ListVersions sorts a copy rather than mutating the source's slice.
+type fixedHistorical struct {
+	historicalFake
+	refs []DataVersionRef
+}
+
+func (f fixedHistorical) ListVersions(ctx context.Context) ([]DataVersionRef, error) {
+	return f.refs, nil
+}
+
+func TestListVersionsDoesNotMutateSourceSlice(t *testing.T) {
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	// Caller-owned slice in newest-first order; ListVersions must not reorder it.
+	own := []DataVersionRef{
+		{ID: "2", Created: t0.Add(time.Hour)},
+		{ID: "1", Created: t0},
+	}
+	src := fixedHistorical{historicalFake: newHistoryFixture(t0), refs: own}
+	svc := NewService()
+
+	out, err := svc.ListVersions(context.Background(), src)
+	if err != nil {
+		t.Fatalf("ListVersions error: %v", err)
+	}
+	if out[0].ID != "1" || out[1].ID != "2" {
+		t.Errorf("returned listing not sorted oldest-first: %+v", out)
+	}
+	if own[0].ID != "2" || own[1].ID != "1" {
+		t.Errorf("source-owned slice was mutated by sort: %+v", own)
+	}
+}
+
+func TestResolveVersionStableTieBreak(t *testing.T) {
+	// Versions sharing an identical Created time must resolve deterministically;
+	// a stable sort preserves the source's input order for the tie.
+	same := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	refs := []DataVersionRef{{ID: "first", Created: same}, {ID: "second", Created: same}}
+	sortVersionsByCreated(refs)
+	if refs[0].ID != "first" || refs[1].ID != "second" {
+		t.Errorf("stable sort did not preserve input order for equal times: %+v", refs)
+	}
+	// resolveVersion keeps the first at-or-before t among equal times (strict
+	// After tie-break, matching Python's strict > tie-break), so with the stable
+	// input order the result is deterministically the first element.
+	ref, err := resolveVersion(refs, same)
+	if err != nil {
+		t.Fatalf("resolveVersion error: %v", err)
+	}
+	if ref.ID != "first" {
+		t.Errorf("resolveVersion tie-break = %q, want deterministic %q", ref.ID, "first")
+	}
+}
+
 func TestAsOfViewIsReadOnly(t *testing.T) {
 	// A historical view is shared across cache hits, so its mutating methods
 	// must refuse to run rather than corrupt the cached snapshot.

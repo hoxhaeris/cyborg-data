@@ -28,6 +28,17 @@ and this package follows [Semantic Versioning](https://semver.org/).
 - Exceptions: `TimeTravelNotSupportedError`, `VersionNotAvailableError`, and
   `ReadOnlyViewError` (all exported from `orgdatacore`).
 
+### Fixed
+
+- Naive request datetimes are interpreted as system local time (not UTC) when
+  resolving `as_of`/`list_versions`, so a naive `datetime.now()` resolves to the
+  correct instant on non-UTC hosts (matching Go's absolute `time.Now()`).
+- The async redaction/anonymization wrappers (`AsyncRedactingDataSource`,
+  `AsyncAnonymizingDataSource`) now support time travel (`list_versions` /
+  `load_version`), matching the sync wrappers.
+- `AsyncService.load_from_data_source` / `as_of` now validate the loaded data
+  structure (e.g. `pii_free` invariants), matching the sync and Go loaders.
+
 ### Notes
 
 - **Read-only snapshots.** A service returned by `as_of` is bound to an

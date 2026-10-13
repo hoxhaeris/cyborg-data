@@ -46,6 +46,10 @@ func (s *Service) listVersionsCached(ctx context.Context, hist HistoricalDataSou
 	if err != nil {
 		return nil, err
 	}
+	// Copy before sorting so we never reorder a slice the source still owns,
+	// and sort stably so versions sharing a Created time keep a deterministic
+	// order (matching Python's stable sorted()).
+	refs = slices.Clone(refs)
 	sortVersionsByCreated(refs)
 
 	if s.versionsTTL > 0 {
@@ -153,7 +157,7 @@ func resolveVersion(refs []DataVersionRef, t time.Time) (DataVersionRef, error) 
 }
 
 func sortVersionsByCreated(refs []DataVersionRef) {
-	slices.SortFunc(refs, func(a, b DataVersionRef) int {
+	slices.SortStableFunc(refs, func(a, b DataVersionRef) int {
 		return a.Created.Compare(b.Created)
 	})
 }

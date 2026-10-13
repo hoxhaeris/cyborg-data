@@ -14,7 +14,6 @@ from orgdatacore._types import (
     Group,
     GroupType,
     Indexes,
-    JiraIndex,
     JiraOwnerInfo,
     Lookups,
     MembershipIndex,
@@ -100,7 +99,6 @@ def create_test_data() -> Data:
                     job_title="Test Manager",
                     slack_uid="U222222",
                     github_id="ghuser2",
-                    is_people_manager=True,
                 ),
             },
             teams={
@@ -183,19 +181,17 @@ def create_test_data() -> Data:
                     "ghuser2": "testuser2",
                 },
             ),
-            jira=JiraIndex(
-                project_component_owners={
-                    "TEST": {
-                        "Core": (JiraOwnerInfo(name="test-squad", type="team"),),
-                        "_project_level": (
-                            JiraOwnerInfo(name="test-squad", type="team"),
-                        ),
-                    },
-                    "PLAT": {
-                        "API": (JiraOwnerInfo(name="test-squad", type="team"),),
-                    },
+            jira={
+                "TEST": {
+                    "Core": [JiraOwnerInfo(name="test-squad", type="team")],
+                    "_project_level": [
+                        JiraOwnerInfo(name="test-squad", type="team"),
+                    ],
                 },
-            ),
+                "PLAT": {
+                    "API": [JiraOwnerInfo(name="test-squad", type="team")],
+                },
+            },
         ),
     )
 

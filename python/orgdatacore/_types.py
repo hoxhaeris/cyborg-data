@@ -5,6 +5,31 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any, BinaryIO, Protocol
 
+from orgindex_schema import (
+    ComponentOwner as ComponentOwnerInfo,
+)
+from orgindex_schema import (
+    EmployeeEntry as Employee,
+)
+from orgindex_schema import (
+    GitHubIdMappings as GitHubIDMappings,
+)
+from orgindex_schema import (
+    Indexes,
+    Metadata,
+)
+from orgindex_schema import (
+    JiraOwner as JiraOwnerInfo,
+)
+from orgindex_schema import (
+    MembershipEntry as MembershipInfo,
+)
+from orgindex_schema import (
+    MembershipIndexInfo as MembershipIndex,
+)
+from orgindex_schema import (
+    SlackIdMappings as SlackIDMappings,
+)
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -73,43 +98,6 @@ class DataSource(Protocol):
         ...
 
 
-class Employee(BaseModel):
-    """Represents an employee in the organizational data."""
-
-    model_config = ConfigDict(frozen=True)
-
-    uid: str = ""
-    full_name: str = ""
-    email: str = ""
-    job_title: str = ""
-    slack_uid: str = ""
-    github_id: str = ""
-    rhat_geo: str = ""
-    cost_center: int = 0
-    manager_uid: str = ""
-    is_people_manager: bool = False
-    timezone: str = ""
-
-    @model_validator(mode="before")
-    @classmethod
-    def _coerce_nulls(cls, data: Any) -> Any:
-        """Coerce null string fields to empty strings to match Go zero-value semantics."""
-        if not isinstance(data, dict):
-            return data
-        for key in (
-            "uid",
-            "full_name",
-            "email",
-            "job_title",
-            "slack_uid",
-            "github_id",
-            "rhat_geo",
-            "manager_uid",
-            "timezone",
-        ):
-            if key in data and data[key] is None:
-                data[key] = ""
-        return data
 
 
 class ChannelInfo(BaseModel):
@@ -361,20 +349,6 @@ class Component(BaseModel):
         return result
 
 
-class Metadata(BaseModel):
-    """Contains summary information about the data."""
-
-    model_config = ConfigDict(frozen=True)
-
-    generated_at: str = ""
-    data_version: str = ""
-    total_employees: int = 0
-    total_orgs: int = 0
-    total_teams: int = 0
-    pii_free: bool = False
-    context_type_descriptions: dict[str, str] = Field(default_factory=dict)
-
-
 class Lookups(BaseModel):
     """Contains the main data objects."""
 
@@ -388,16 +362,6 @@ class Lookups(BaseModel):
     components: dict[str, Component] = Field(default_factory=dict)
 
 
-class MembershipInfo(BaseModel):
-    """Represents a membership entry with name and type."""
-
-    model_config = ConfigDict(frozen=True)
-
-    name: str = ""
-    type: str = ""
-    stable_id: str = ""
-
-
 class HierarchyPathEntry(BaseModel):
     """Single entry in a hierarchy path (name and type)."""
 
@@ -406,32 +370,6 @@ class HierarchyPathEntry(BaseModel):
     name: str = ""
     type: str = ""
     stable_id: str = ""
-
-
-class MembershipIndex(BaseModel):
-    """Represents the membership index structure."""
-
-    model_config = ConfigDict(frozen=True)
-
-    membership_index: dict[str, tuple[MembershipInfo, ...]] = Field(
-        default_factory=dict
-    )
-
-
-class SlackIDMappings(BaseModel):
-    """Contains Slack ID to UID mappings."""
-
-    model_config = ConfigDict(frozen=True)
-
-    slack_uid_to_uid: dict[str, str] = Field(default_factory=dict)
-
-
-class GitHubIDMappings(BaseModel):
-    """Contains GitHub ID to UID mappings."""
-
-    model_config = ConfigDict(frozen=True)
-
-    github_id_to_uid: dict[str, str] = Field(default_factory=dict)
 
 
 class HierarchyNode(BaseModel):
@@ -445,16 +383,6 @@ class HierarchyNode(BaseModel):
     children: tuple["HierarchyNode", ...] = ()
 
 
-class ComponentOwnerInfo(BaseModel):
-    """Represents an entity that owns a component, with ownership type."""
-
-    model_config = ConfigDict(frozen=True)
-
-    name: str = ""
-    type: str = ""
-    ownership_types: tuple[str, ...] = ()
-
-
 class ComponentOwnership(BaseModel):
     """Represents a component owned by a team, with ownership type."""
 
@@ -462,56 +390,6 @@ class ComponentOwnership(BaseModel):
 
     component: str = ""
     ownership_types: tuple[str, ...] = ()
-
-
-class JiraOwnerInfo(BaseModel):
-    """Represents an entity that owns a Jira project/component."""
-
-    model_config = ConfigDict(frozen=True)
-
-    name: str = ""
-    type: str = ""
-
-
-class JiraIndex(BaseModel):
-    """Contains Jira project/component to team mappings.
-
-    Structure: project -> component -> list of owner entities.
-    Special key "_project_level" indicates project-level ownership.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    project_component_owners: dict[str, dict[str, tuple[JiraOwnerInfo, ...]]] = Field(
-        default_factory=dict
-    )
-
-
-class ComponentOwnershipIndex(BaseModel):
-    """Contains component-to-team ownership mappings.
-
-    Structure: component_name -> list of owner entities with ownership types.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    component_owners: dict[str, tuple[ComponentOwnerInfo, ...]] = Field(
-        default_factory=dict
-    )
-
-
-class Indexes(BaseModel):
-    """Contains pre-computed lookup tables."""
-
-    model_config = ConfigDict(frozen=True)
-
-    membership: MembershipIndex = Field(default_factory=MembershipIndex)
-    slack_id_mappings: SlackIDMappings = Field(default_factory=SlackIDMappings)
-    github_id_mappings: GitHubIDMappings = Field(default_factory=GitHubIDMappings)
-    jira: JiraIndex = Field(default_factory=JiraIndex)
-    component_ownership: ComponentOwnershipIndex = Field(
-        default_factory=ComponentOwnershipIndex
-    )
 
 
 class Data(BaseModel):
@@ -555,3 +433,52 @@ class GCSConfig(BaseModel):
     project_id: str = ""
     credentials_json: str = ""
     check_interval: timedelta = Field(default_factory=lambda: timedelta(minutes=5))
+
+
+__all__ = [
+    # Canonical on-disk models, re-exported from orgindex-schema under the
+    # historical orgdatacore names (OCPCRT-658).
+    "Employee",
+    "Metadata",
+    "Indexes",
+    "MembershipInfo",
+    "MembershipIndex",
+    "SlackIDMappings",
+    "GitHubIDMappings",
+    "JiraOwnerInfo",
+    "ComponentOwnerInfo",
+    # Local on-disk models (hierarchy/leaf; canonical adoption pending 659 + fixtures).
+    "ChannelInfo",
+    "AliasInfo",
+    "SlackConfig",
+    "RoleInfo",
+    "JiraInfo",
+    "RepoInfo",
+    "EmailInfo",
+    "ResourceInfo",
+    "EscalationContactInfo",
+    "ContextItemInfo",
+    "GroupType",
+    "Group",
+    "ParentInfo",
+    "Team",
+    "Org",
+    "Pillar",
+    "TeamGroup",
+    "Component",
+    "Lookups",
+    "Data",
+    # Query-result and infrastructure types (not on-disk; stay local).
+    "HierarchyPathEntry",
+    "HierarchyNode",
+    "ComponentOwnership",
+    "OrgInfo",
+    "DataVersion",
+    "GCSConfig",
+    "DataSource",
+    # Enums.
+    "PIIMode",
+    "MembershipType",
+    "EntityType",
+    "OrgInfoType",
+]

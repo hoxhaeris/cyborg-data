@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -442,6 +442,7 @@ name = "orgdatacore"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "orgindex-schema" },
     { name = "pydantic" },
 ]
 
@@ -476,6 +477,7 @@ requires-dist = [
     { name = "google-cloud-storage", marker = "extra == 'gcs'", specifier = ">=2.0.0" },
     { name = "isort", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "orgindex-schema", git = "https://github.com/openshift-eng/orgindex-schema.git?rev=v0.1.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
@@ -493,6 +495,14 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
     { name = "pytest-cov", specifier = ">=4.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
+]
+
+[[package]]
+name = "orgindex-schema"
+version = "0.1.0"
+source = { git = "https://github.com/openshift-eng/orgindex-schema.git?rev=v0.1.0#9ea3f7aa96c7e4450f77e5fd9508eb272543fc6a" }
+dependencies = [
+    { name = "pydantic" },
 ]
 
 [[package]]

@@ -38,15 +38,13 @@ class TestModelValidate:
         emp = Employee.model_validate(data)
         assert emp.uid == "jsmith"
         assert emp.full_name == "John Smith"
-        assert emp.cost_center == 42
-        assert emp.is_people_manager is True
+        assert emp.email == "jsmith@example.com"
+        assert emp.github_id == "jsmith-gh"
 
     def test_employee_missing_fields_uses_defaults(self):
         emp = Employee.model_validate({"uid": "x"})
         assert emp.uid == "x"
         assert emp.full_name == ""
-        assert emp.cost_center == 0
-        assert emp.is_people_manager is False
 
     def test_employee_empty_dict(self):
         emp = Employee.model_validate({})

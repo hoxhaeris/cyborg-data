@@ -30,7 +30,7 @@ class EntityConfig:
 
 
 ENTITY_REGISTRY: dict[str, EntityConfig] = {
-    "Employee": EntityConfig(
+    "EmployeeEntry": EntityConfig(
         fields=("uid", "full_name", "email"),
         sort_by=("uid",),
     ),
@@ -62,7 +62,7 @@ ENTITY_REGISTRY: dict[str, EntityConfig] = {
         fields=("name", "type"),
         sort_by=("name",),
     ),
-    "JiraOwnerInfo": EntityConfig(
+    "JiraOwner": EntityConfig(
         fields=("name", "type"),
         sort_by=("name",),
     ),
@@ -70,7 +70,7 @@ ENTITY_REGISTRY: dict[str, EntityConfig] = {
         fields=("project", "component"),
         sort_by=("project", "component"),
     ),
-    "MembershipInfo": EntityConfig(
+    "MembershipEntry": EntityConfig(
         fields=("name", "type"),
         sort_by=("name", "type"),
     ),
@@ -78,7 +78,7 @@ ENTITY_REGISTRY: dict[str, EntityConfig] = {
         fields=("name", "url", "description"),
         preserve_order=True,
     ),
-    "ComponentOwnerInfo": EntityConfig(
+    "ComponentOwner": EntityConfig(
         fields=("name", "type", "ownership_types"),
         sort_by=("name", "type"),
     ),

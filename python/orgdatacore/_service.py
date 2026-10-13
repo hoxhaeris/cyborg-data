@@ -5,7 +5,7 @@ import threading
 import time
 from collections import OrderedDict
 from datetime import UTC, datetime, timedelta
-from typing import Any, BinaryIO, NamedTuple, cast
+from typing import Any, BinaryIO, NamedTuple
 
 from ._exceptions import (
     DataLoadError,
@@ -17,7 +17,6 @@ from ._types import (
     Component,
     ComponentOwnerInfo,
     ComponentOwnership,
-    ComponentOwnershipIndex,
     ContextItemInfo,
     Data,
     DataSource,
@@ -26,15 +25,12 @@ from ._types import (
     Employee,
     EntityType,
     EscalationContactInfo,
-    GitHubIDMappings,
     HierarchyNode,
     HierarchyPathEntry,
     HistoricalDataSource,
     Indexes,
-    JiraIndex,
     JiraOwnerInfo,
     Lookups,
-    MembershipIndex,
     MembershipInfo,
     MembershipType,
     Metadata,
@@ -42,7 +38,6 @@ from ._types import (
     OrgInfo,
     OrgInfoType,
     Pillar,
-    SlackIDMappings,
     Team,
     TeamGroup,
 )
@@ -98,37 +93,21 @@ def _ancestor_org_info_type(entity_type: EntityType) -> OrgInfoType:
             return OrgInfoType.ORGANIZATION
 
 
-def _parse_jira_index(jira_raw: dict[str, Any]) -> JiraIndex:
-    """Parse the Jira index from raw data."""
-    project_component_owners: dict[str, dict[str, tuple[JiraOwnerInfo, ...]]] = {}
-
-    for project, components in jira_raw.items():
-        if not isinstance(components, dict):
-            continue
-        project_component_owners[project] = {}
-        components_dict = cast(dict[str, Any], components)
-        for component, owners in components_dict.items():
-            if isinstance(owners, list):
-                owners_list = cast(list[dict[str, Any]], owners)
-                project_component_owners[project][component] = tuple(
-                    JiraOwnerInfo.model_validate(o) for o in owners_list
-                )
-
-    return JiraIndex(project_component_owners=project_component_owners)
+_EMP_NULLABLE = (
+    "email",
+    "job_title",
+    "github_id",
+    "manager_uid",
+    "slack_uid",
+    "timezone",
+)
 
 
-def _parse_component_ownership_index(raw: dict[str, Any]) -> ComponentOwnershipIndex:
-    """Parse the component ownership index from raw data."""
-    component_owners: dict[str, tuple[ComponentOwnerInfo, ...]] = {}
-
-    for component_name, owners in raw.items():
-        if isinstance(owners, list):
-            owners_list = cast(list[dict[str, Any]], owners)
-            component_owners[component_name] = tuple(
-                ComponentOwnerInfo.model_validate(o) for o in owners_list
-            )
-
-    return ComponentOwnershipIndex(component_owners=component_owners)
+def _parse_employee(raw: dict[str, Any]) -> Employee:
+    """Validate an employee record, coercing null string fields to "" to match Go
+    zero-value semantics (the canonical model types these fields as str | None)."""
+    coerced = {**raw, **{k: (raw.get(k) or "") for k in _EMP_NULLABLE}}
+    return Employee.model_validate(coerced)
 
 
 def parse_data(raw_data: dict[str, Any]) -> Data:
@@ -138,8 +117,7 @@ def parse_data(raw_data: dict[str, Any]) -> Data:
     lookups_raw = raw_data.get("lookups", {})
     lookups = Lookups(
         employees={
-            k: Employee.model_validate(v)
-            for k, v in lookups_raw.get("employees", {}).items()
+            k: _parse_employee(v) for k, v in lookups_raw.get("employees", {}).items()
         },
         teams={
             k: Team.model_validate(v) for k, v in lookups_raw.get("teams", {}).items()
@@ -159,42 +137,9 @@ def parse_data(raw_data: dict[str, Any]) -> Data:
         },
     )
 
-    indexes_raw = raw_data.get("indexes", {})
-    membership_raw = indexes_raw.get("membership", {})
-
-    membership_index_raw = membership_raw.get("membership_index", {})
-    membership_index = {
-        k: tuple(MembershipInfo.model_validate(m) for m in v)
-        for k, v in membership_index_raw.items()
-    }
-
-    membership = MembershipIndex(
-        membership_index=membership_index,
-    )
-
-    slack_mappings_raw = indexes_raw.get("slack_id_mappings", {})
-    slack_id_mappings = SlackIDMappings(
-        slack_uid_to_uid=slack_mappings_raw.get("slack_uid_to_uid", {}),
-    )
-
-    github_mappings_raw = indexes_raw.get("github_id_mappings", {})
-    github_id_mappings = GitHubIDMappings(
-        github_id_to_uid=github_mappings_raw.get("github_id_to_uid", {}),
-    )
-
-    jira_raw = indexes_raw.get("jira", {})
-    jira_index = _parse_jira_index(jira_raw)
-
-    component_ownership_raw = indexes_raw.get("component_ownership", {})
-    component_ownership = _parse_component_ownership_index(component_ownership_raw)
-
-    indexes = Indexes(
-        membership=membership,
-        slack_id_mappings=slack_id_mappings,
-        github_id_mappings=github_id_mappings,
-        jira=jira_index,
-        component_ownership=component_ownership,
-    )
+    # The indexes subtree (membership, slack/github mappings, and the bare jira /
+    # component_ownership maps) is the canonical on-disk shape; validate it directly.
+    indexes = Indexes.model_validate(raw_data.get("indexes", {}))
 
     return Data(
         metadata=metadata,
@@ -414,7 +359,9 @@ class Service:
                 for ch in team.group.slack.channels:
                     if ch.channel:
                         normalized = _normalize_slack_channel(ch.channel)
-                        self._slack_channel_index.setdefault(normalized, []).append(team.name)
+                        self._slack_channel_index.setdefault(normalized, []).append(
+                            team.name
+                        )
 
             self._build_derived_indexes()
 
@@ -469,12 +416,28 @@ class Service:
                 all_edges_identified = False
 
         for name, team in self._data.lookups.teams.items():
-            register(name, EntityType.TEAM, team.stable_id, team.parent_id, team.parent is not None)
+            register(
+                name,
+                EntityType.TEAM,
+                team.stable_id,
+                team.parent_id,
+                team.parent is not None,
+            )
         for name, org in self._data.lookups.orgs.items():
-            register(name, EntityType.ORG, org.stable_id, org.parent_id, org.parent is not None)
+            register(
+                name,
+                EntityType.ORG,
+                org.stable_id,
+                org.parent_id,
+                org.parent is not None,
+            )
         for name, pillar in self._data.lookups.pillars.items():
             register(
-                name, EntityType.PILLAR, pillar.stable_id, pillar.parent_id, pillar.parent is not None
+                name,
+                EntityType.PILLAR,
+                pillar.stable_id,
+                pillar.parent_id,
+                pillar.parent is not None,
             )
         for name, tg in self._data.lookups.team_groups.items():
             register(
@@ -649,7 +612,10 @@ class Service:
         if self._versions_ttl > 0:
             with self._versions_lock:
                 entry = self._versions_cache.get(key)
-                if entry is not None and (time.monotonic() - entry[0]) < self._versions_ttl:
+                if (
+                    entry is not None
+                    and (time.monotonic() - entry[0]) < self._versions_ttl
+                ):
                     return entry[1]
         try:
             refs = source.list_versions()  # type: ignore[attr-defined]
@@ -780,7 +746,7 @@ class Service:
                 return None
             email_lower = email.lower()
             for emp in self._data.lookups.employees.values():
-                if emp.email.lower() == email_lower:
+                if (emp.email or "").lower() == email_lower:
                     return emp
             return None
 
@@ -934,9 +900,7 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            owners = self._data.indexes.component_ownership.component_owners.get(
-                component_name, ()
-            )
+            owners = self._data.indexes.component_ownership.get(component_name, [])
             return list(owners)
 
     def get_components_for_team(self, team_name: str) -> list[ComponentOwnership]:
@@ -959,10 +923,8 @@ class Service:
                 return []
             result: list[ComponentOwnership] = []
             for cr in team.group.component_roles:
-                ownership_types: tuple[str, ...] = ()
-                owners = self._data.indexes.component_ownership.component_owners.get(
-                    cr, ()
-                )
+                ownership_types: list[str] = []
+                owners = self._data.indexes.component_ownership.get(cr, [])
                 for owner in owners:
                     if owner.name == team_name:
                         ownership_types = owner.ownership_types
@@ -970,7 +932,7 @@ class Service:
                 result.append(
                     ComponentOwnership(
                         component=cr,
-                        ownership_types=ownership_types,
+                        ownership_types=tuple(ownership_types),
                     )
                 )
             return result
@@ -1542,7 +1504,7 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            return list(self._data.indexes.jira.project_component_owners.keys())
+            return list(self._data.indexes.jira.keys())
 
     def get_jira_components(self, project: str) -> list[str]:
         """Get all components for a Jira project.
@@ -1556,9 +1518,7 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            components = self._data.indexes.jira.project_component_owners.get(
-                project, {}
-            )
+            components = self._data.indexes.jira.get(project, {})
             return list(components.keys())
 
     def get_teams_by_jira_project(self, project: str) -> list[JiraOwnerInfo]:
@@ -1573,9 +1533,7 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            components = self._data.indexes.jira.project_component_owners.get(
-                project, {}
-            )
+            components = self._data.indexes.jira.get(project, {})
             seen: set[str] = set()
             result: list[JiraOwnerInfo] = []
             for owners in components.values():
@@ -1600,10 +1558,8 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            components = self._data.indexes.jira.project_component_owners.get(
-                project, {}
-            )
-            owners = components.get(component, ())
+            components = self._data.indexes.jira.get(project, {})
+            owners = components.get(component, [])
             return list(owners)
 
     def get_jira_ownership_for_team(self, team_name: str) -> list[dict[str, str]]:
@@ -1622,7 +1578,7 @@ class Service:
             for (
                 project,
                 components,
-            ) in self._data.indexes.jira.project_component_owners.items():
+            ) in self._data.indexes.jira.items():
                 for component, owners in components.items():
                     for owner in owners:
                         if owner.name == team_name:

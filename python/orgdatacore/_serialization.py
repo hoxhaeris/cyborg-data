@@ -57,18 +57,18 @@ def data_to_dict(data: Data) -> dict[str, Any]:
         },
     }
     # Add jira index if present
-    if data.indexes.jira.project_component_owners:
+    if data.indexes.jira:
         result["indexes"]["jira"] = {
             project: {
                 component: [o.model_dump() for o in owners]
                 for component, owners in components.items()
             }
-            for project, components in data.indexes.jira.project_component_owners.items()
+            for project, components in data.indexes.jira.items()
         }
-    if data.indexes.component_ownership.component_owners:
+    if data.indexes.component_ownership:
         result["indexes"]["component_ownership"] = {
             component_name: [o.model_dump() for o in owners]
-            for component_name, owners in data.indexes.component_ownership.component_owners.items()
+            for component_name, owners in data.indexes.component_ownership.items()
         }
     return result
 
@@ -116,13 +116,8 @@ def employee_to_dict(emp: Employee) -> dict[str, Any]:
         d["slack_uid"] = emp.slack_uid
     if emp.github_id:
         d["github_id"] = emp.github_id
-    if emp.rhat_geo:
-        d["rhat_geo"] = emp.rhat_geo
-    if emp.cost_center:
-        d["cost_center"] = emp.cost_center
     if emp.manager_uid:
         d["manager_uid"] = emp.manager_uid
-    d["is_people_manager"] = emp.is_people_manager
     if emp.timezone:
         d["timezone"] = emp.timezone
     return d

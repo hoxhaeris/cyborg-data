@@ -25,7 +25,10 @@ classifiers = [
 ]
 keywords = ["organizational-data", "employees", "teams", "organizations"]
 
-dependencies = ["pydantic>=2.0"]
+dependencies = [
+    "pydantic>=2.0",
+    "orgindex-schema",
+]
 
 [project.optional-dependencies]
 gcs = [
@@ -47,6 +50,11 @@ Repository = "https://github.com/openshift-eng/cyborg-data"
 
 [tool.hatch.build.targets.wheel]
 packages = ["orgdatacore"]
+
+[tool.uv.sources]
+# TEMPORARY local path for the canonical index schema; swap for a pinned git
+# dependency once openshift-eng/orgindex-schema is published.
+orgindex-schema = { path = "../../orgindex-schema", editable = true }
 
 [tool.uv]
 dev-dependencies = [

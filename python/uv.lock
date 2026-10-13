@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -442,6 +442,7 @@ name = "orgdatacore"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "orgindex-schema" },
     { name = "pydantic" },
 ]
 
@@ -476,6 +477,7 @@ requires-dist = [
     { name = "google-cloud-storage", marker = "extra == 'gcs'", specifier = ">=2.0.0" },
     { name = "isort", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "orgindex-schema", editable = "../../orgindex-schema" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
@@ -494,6 +496,23 @@ dev = [
     { name = "pytest-cov", specifier = ">=4.0.0" },
     { name = "ruff", specifier = ">=0.1.0" },
 ]
+
+[[package]]
+name = "orgindex-schema"
+version = "0.1.0"
+source = { editable = "../../orgindex-schema" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13,<2.0" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0,<9" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6,<0.9" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "packaging"

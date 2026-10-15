@@ -261,13 +261,25 @@ class _AnonymizationEngine:
 
 
 def _remap_group(group: Group | None, uid_to_nonce: dict[str, str]) -> Group | None:
-    """Return a new Group with people UIDs replaced by nonces (None if no group)."""
+    """Return a new Group with people UIDs replaced by nonces (None if no group).
+
+    UIDs with no mapping (not an employee in this index) are dropped rather than
+    passed through: retaining them would emit a real UID in anonymized output.
+    """
     if group is None:
         return None
-    new_people = [uid_to_nonce.get(uid, uid) for uid in group.resolved_people_uid_list]
+    new_people = [
+        uid_to_nonce[uid]
+        for uid in group.resolved_people_uid_list
+        if uid in uid_to_nonce
+    ]
     new_roles = [
         role.model_copy(
-            update={"people": [uid_to_nonce.get(uid, uid) for uid in role.people]}
+            update={
+                "people": [
+                    uid_to_nonce[uid] for uid in role.people if uid in uid_to_nonce
+                ]
+            }
         )
         for role in group.resolved_roles
     ]

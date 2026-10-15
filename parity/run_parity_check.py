@@ -277,23 +277,25 @@ def compare_results(
     return failures
 
 
-def normalize_output(output: Any) -> Any:
+def normalize_output(output: Any, _nested: bool = False) -> Any:
     """Normalize output for comparison.
 
-    None and "" are treated as equal: the canonical models type optional strings
-    as ``str | None`` (absent -> None) while Go uses the zero value "". Both mean
-    "no value", so they must not count as a parity mismatch.
+    Within a result (nested inside a dict/list) None and "" are treated as equal:
+    canonical models type optional string fields as ``str | None`` (absent -> None)
+    while Go uses the zero value "", and both mean "no value". A *top-level* None
+    is kept distinct, so a method that returns a missing result (null) on one side
+    but an empty string on the other is still reported as a mismatch.
     """
     if output is None:
-        return ""
+        return "" if _nested else None
     if isinstance(output, bool):
         return output
     if isinstance(output, str):
         return output
     if isinstance(output, list):
-        return [normalize_output(item) for item in output]
+        return [normalize_output(item, True) for item in output]
     if isinstance(output, dict):
-        return {k: normalize_output(v) for k, v in sorted(output.items())}
+        return {k: normalize_output(v, True) for k, v in sorted(output.items())}
     return output
 
 

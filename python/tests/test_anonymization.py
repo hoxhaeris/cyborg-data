@@ -222,6 +222,29 @@ class TestAnonymizingDataSourceAnonymizedMode:
         for emp in result["lookups"]["employees"].values():
             assert not emp.get("possible_github_ids")
 
+    def test_unmapped_group_uid_dropped(self) -> None:
+        """A roster UID that is not an employee must not survive as a real UID."""
+        data = {
+            "metadata": {},
+            "lookups": {
+                "employees": {"jsmith": {"uid": "jsmith", "full_name": "John Smith"}},
+                "teams": {
+                    "t": {
+                        "name": "t",
+                        "group": {
+                            "resolved_people_uid_list": ["jsmith", "orphan-real-uid"]
+                        },
+                    }
+                },
+            },
+            "indexes": {"membership": {"membership_index": {"jsmith": []}}},
+        }
+        source = AnonymizingDataSource(FakeDataSource(data), PIIMode.ANONYMIZED)
+        result = json.load(source.load())
+        people = result["lookups"]["teams"]["t"]["group"]["resolved_people_uid_list"]
+        assert "orphan-real-uid" not in people
+        assert all(p.startswith("HUMAN-") for p in people)
+
     def test_manager_uid_consistent(self, sample_data: dict) -> None:
         """Manager UID should use the same nonce as the manager's employee record."""
         inner = FakeDataSource(sample_data)

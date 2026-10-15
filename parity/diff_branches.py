@@ -48,7 +48,6 @@ EMP = {"Employee", "EmployeeEntry"}
 HIER = {"Team", "Org", "Pillar", "TeamGroup", "HierarchyEntity"}
 COMP = {"Component", "ComponentEntry"}
 PARENT = {"ParentInfo", "ParentRef"}
-GROUP = {"Group", "GroupInfo"}
 CTX = {"ContextItemInfo"}
 ESC = {"EscalationContactInfo"}
 PATH = {"HierarchyPathEntry"}
@@ -190,7 +189,10 @@ def run(index_path: str, out_path: str) -> None:
         try:
             rec(method, case, fn())
         except Exception as e:
-            results[f"{method}|{case}"] = {"_error": f"{type(e).__name__}: {e}"}
+            # Store only the exception type, not the message: identical error
+            # behavior must compare equal even if wording differs across branches
+            # (e.g. a ValidationError naming EmployeeEntry vs Employee).
+            results[f"{method}|{case}"] = {"_error": type(e).__name__}
 
     # no-arg
     for m in [

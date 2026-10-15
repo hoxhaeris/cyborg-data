@@ -27,11 +27,12 @@ class RedactingDataSource:
     from the inner data source and strips PII fields before the data
     is parsed by Service, so PII is not propagated to downstream consumers.
 
-    PII fields redacted:
+    PII fields redacted (emitted as empty values in the JSON, not omitted):
     - full_name -> "[REDACTED]"
     - email -> "[REDACTED]"
-    - slack_uid -> "" (omitted from JSON)
-    - github_id -> "" (omitted from JSON)
+    - slack_uid -> ""
+    - github_id -> ""
+    - possible_github_ids -> []
 
     PII indexes cleared:
     - slack_id_mappings.slack_uid_to_uid
@@ -152,6 +153,7 @@ def _redact(data: Data) -> Data:
                 "email": "[REDACTED]",
                 "slack_uid": "",
                 "github_id": "",
+                "possible_github_ids": [],
             }
         )
         for uid, emp in data.lookups.employees.items()

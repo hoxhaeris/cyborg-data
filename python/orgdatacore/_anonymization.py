@@ -170,6 +170,9 @@ class _AnonymizationEngine:
                     "email": "[ANONYMIZED]",
                     "slack_uid": uid_to_slack_nonce.get(uid, ""),
                     "github_id": uid_to_github_nonce.get(uid, ""),
+                    # Alternate GitHub IDs are real identifiers; clear them so a
+                    # person cannot be re-identified by a secondary GitHub handle.
+                    "possible_github_ids": [],
                     "manager_uid": manager_nonce,
                 }
             )
@@ -300,6 +303,7 @@ class AnonymizingDataSource:
     - email -> "[ANONYMIZED]"
     - slack_uid -> SLACK-<hex> nonce
     - github_id -> GITHUB-<hex> nonce
+    - possible_github_ids -> [] (cleared)
     - manager_uid -> mapped HUMAN nonce (consistent)
 
     Indexes re-mapped:

@@ -38,6 +38,7 @@ def sample_employee_data() -> dict:
                     "job_title": "Senior Engineer",
                     "slack_uid": "U12345678",
                     "github_id": "jsmith-gh",
+                    "possible_github_ids": ["jsmith-alt", "jsmith-old"],
                     "manager_uid": "adoe",
                 },
                 "adoe": {
@@ -157,6 +158,17 @@ class TestRedactingDataSourceRedactedMode:
 
         assert not result["lookups"]["employees"]["jsmith"].get("github_id")
         assert not result["lookups"]["employees"]["adoe"].get("github_id")
+
+    def test_redacted_mode_clears_possible_github_ids(
+        self, sample_employee_data: dict
+    ) -> None:
+        """possible_github_ids (real alternate GitHub handles) must be cleared."""
+        inner = FakeDataSource(sample_employee_data)
+        source = RedactingDataSource(inner, PIIMode.REDACTED)
+
+        result = json.load(source.load())
+
+        assert not result["lookups"]["employees"]["jsmith"].get("possible_github_ids")
 
     def test_redacted_mode_preserves_non_pii_fields(
         self, sample_employee_data: dict

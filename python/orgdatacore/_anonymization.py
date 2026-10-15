@@ -221,6 +221,12 @@ class _AnonymizationEngine:
             )
             for name, tg in data.lookups.team_groups.items()
         }
+        new_cohorts = {
+            name: c.model_copy(
+                update={"group": _remap_group(c.group, self._uid_to_nonce)}
+            )
+            for name, c in data.lookups.cohorts.items()
+        }
 
         return data.model_copy(
             update={
@@ -231,6 +237,7 @@ class _AnonymizationEngine:
                         "orgs": new_orgs,
                         "pillars": new_pillars,
                         "team_groups": new_team_groups,
+                        "cohorts": new_cohorts,
                     }
                 ),
                 "indexes": data.indexes.model_copy(
@@ -250,41 +257,31 @@ class _AnonymizationEngine:
         )
 
 
-def _remap_group(group: Group, uid_to_nonce: dict[str, str]) -> Group:
-    """Return a new Group with people UIDs replaced by nonces."""
-    new_people = tuple(
-        uid_to_nonce.get(uid, uid) for uid in group.resolved_people_uid_list
-    )
-    new_roles = (
-        tuple(
-            role.model_copy(
-                update={
-                    "people": tuple(uid_to_nonce.get(uid, uid) for uid in role.people)
-                }
-            )
-            for role in group.roles
+def _remap_group(group: Group | None, uid_to_nonce: dict[str, str]) -> Group | None:
+    """Return a new Group with people UIDs replaced by nonces (None if no group)."""
+    if group is None:
+        return None
+    new_people = [uid_to_nonce.get(uid, uid) for uid in group.resolved_people_uid_list]
+    new_roles = [
+        role.model_copy(
+            update={"people": [uid_to_nonce.get(uid, uid) for uid in role.people]}
         )
-        if group.roles
-        else ()
-    )
-    new_escalation = (
-        tuple(
-            contact.model_copy(
-                update={
-                    "name": "[ANONYMIZED]",
-                    "url": "",
-                    "description": "[ANONYMIZED]",
-                }
-            )
-            for contact in group.escalation
+        for role in group.resolved_roles
+    ]
+    new_escalation = [
+        contact.model_copy(
+            update={
+                "name": "[ANONYMIZED]",
+                "url": "",
+                "description": "[ANONYMIZED]",
+            }
         )
-        if group.escalation
-        else ()
-    )
+        for contact in group.escalation
+    ]
     return group.model_copy(
         update={
             "resolved_people_uid_list": new_people,
-            "roles": new_roles,
+            "resolved_roles": new_roles,
             "escalation": new_escalation,
         }
     )

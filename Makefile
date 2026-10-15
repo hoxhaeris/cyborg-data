@@ -11,8 +11,6 @@
 # Default target
 all: test
 
-PYTHON ?= python
-
 help:
 	@echo "Multi-Language Build System for cyborg-data"
 	@echo ""
@@ -79,9 +77,13 @@ go-bench:
 	cd go && $(MAKE) bench
 
 # Python targets
+#
+# Python tooling runs through `uv run`, which syncs the project environment
+# (including the git-sourced orgindex-schema dependency) before executing.
+# Invoking a bare interpreter would miss that dependency and fail to import.
 python-test:
 	@echo "Running Python tests..."
-	cd python && pytest
+	cd python && uv run pytest
 
 python-lint:
 	@echo "Running Python linter..."
@@ -89,7 +91,7 @@ python-lint:
 
 python-typing:
 	@echo "Running Python type checker (mypy strict)..."
-	cd python && $(PYTHON) -m mypy orgdatacore
+	cd python && uv run mypy orgdatacore
 
 python-format:
 	@echo "Formatting Python code..."

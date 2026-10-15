@@ -79,7 +79,6 @@ def create_test_data() -> Data:
             data_version="test-v1.0",
             total_employees=2,
             total_orgs=1,
-            total_teams=1,
         ),
         lookups=Lookups(
             employees={
@@ -103,55 +102,46 @@ def create_test_data() -> Data:
             },
             teams={
                 "test-squad": Team(
-                    uid="team1",
                     name="test-squad",
-                    type="team",
                     parent=ParentInfo(name="test-team-group", type="team_group"),
                     group=Group(
                         type=GroupType(name="team"),
-                        resolved_people_uid_list=("testuser1", "testuser2"),
+                        resolved_people_uid_list=["testuser1", "testuser2"],
                     ),
                 ),
             },
             orgs={
                 "test-division": Org(
-                    uid="org1",
                     name="test-division",
-                    type="organization",
                     group=Group(
                         type=GroupType(name="organization"),
-                        resolved_people_uid_list=("testuser1", "testuser2"),
+                        resolved_people_uid_list=["testuser1", "testuser2"],
                     ),
                 ),
             },
             pillars={
                 "test-pillar": Pillar(
-                    uid="pillar1",
                     name="test-pillar",
-                    type="pillar",
                     parent=ParentInfo(name="test-division", type="org"),
                     group=Group(
                         type=GroupType(name="pillar"),
-                        resolved_people_uid_list=("testuser1", "testuser2"),
+                        resolved_people_uid_list=["testuser1", "testuser2"],
                     ),
                 ),
             },
             team_groups={
                 "test-team-group": TeamGroup(
-                    uid="tg1",
                     name="test-team-group",
-                    type="team_group",
                     parent=ParentInfo(name="test-pillar", type="pillar"),
                     group=Group(
                         type=GroupType(name="team_group"),
-                        resolved_people_uid_list=("testuser1", "testuser2"),
+                        resolved_people_uid_list=["testuser1", "testuser2"],
                     ),
                 ),
             },
             components={
                 "test-component": Component(
                     name="test-component",
-                    type="system",
                     description="Test component",
                 ),
             },

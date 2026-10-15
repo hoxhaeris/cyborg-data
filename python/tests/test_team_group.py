@@ -24,9 +24,7 @@ class TestGetTeamGroupByName:
             lookups=Lookups(
                 team_groups={
                     "Platform Teams": TeamGroup(
-                        uid="tg1",
                         name="Platform Teams",
-                        type="team_group",
                         group=Group(
                             type=GroupType(name="team_group"),
                             resolved_people_uid_list=("user1", "user2"),
@@ -43,7 +41,7 @@ class TestGetTeamGroupByName:
 
         result = service.get_team_group_by_name("Platform Teams")
         assert result is not None
-        assert result.uid == "tg1"
+        assert result.name == "Platform Teams"
 
     def test_get_nonexistent_team_group(self):
         """Test that getting a nonexistent team group returns None."""
@@ -52,9 +50,7 @@ class TestGetTeamGroupByName:
             lookups=Lookups(
                 team_groups={
                     "Platform Teams": TeamGroup(
-                        uid="tg1",
                         name="Platform Teams",
-                        type="team_group",
                         group=Group(
                             type=GroupType(name="team_group"),
                             resolved_people_uid_list=("user1", "user2"),
@@ -83,11 +79,9 @@ class TestGetAllTeamGroupNames:
             lookups=Lookups(
                 team_groups={
                     "Platform Teams": TeamGroup(
-                        uid="tg1",
                         name="Platform Teams",
                     ),
                     "Product Teams": TeamGroup(
-                        uid="tg2",
                         name="Product Teams",
                     ),
                 },

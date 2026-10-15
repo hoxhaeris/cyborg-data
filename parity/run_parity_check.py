@@ -278,9 +278,14 @@ def compare_results(
 
 
 def normalize_output(output: Any) -> Any:
-    """Normalize output for comparison."""
+    """Normalize output for comparison.
+
+    None and "" are treated as equal: the canonical models type optional strings
+    as ``str | None`` (absent -> None) while Go uses the zero value "". Both mean
+    "no value", so they must not count as a parity mismatch.
+    """
     if output is None:
-        return None
+        return ""
     if isinstance(output, bool):
         return output
     if isinstance(output, str):

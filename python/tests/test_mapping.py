@@ -1,12 +1,13 @@
-"""Tests for pydantic model validation and serialization behavior.
+"""Tests for canonical pydantic model validation and serialization behavior.
 
-Replaces the old _mapping.py unit tests. Validates that pydantic models
-correctly handle JSON parsing, aliased fields, defaults, and round-trips.
+Validates that the canonical orgindex-schema models (re-exported by orgdatacore)
+correctly handle JSON parsing, defaults, nested shapes, and round-trips.
 """
 
 import pytest
 from pydantic import ValidationError
 
+from orgdatacore._service import _parse_employee
 from orgdatacore._types import (
     Component,
     Employee,
@@ -29,10 +30,7 @@ class TestModelValidate:
             "job_title": "Engineer",
             "slack_uid": "U123",
             "github_id": "jsmith-gh",
-            "rhat_geo": "NA",
-            "cost_center": 42,
             "manager_uid": "mgr1",
-            "is_people_manager": True,
             "timezone": "US/Eastern",
         }
         emp = Employee.model_validate(data)
@@ -52,122 +50,136 @@ class TestModelValidate:
 
     def test_nested_model_validation(self):
         data = {
-            "uid": "t1",
             "name": "Team One",
-            "type": "team",
             "group": {
                 "type": {"name": "dev"},
                 "resolved_people_uid_list": ["a", "b"],
             },
         }
         team = Team.model_validate(data)
+        assert team.group is not None
+        assert team.group.type is not None
         assert team.group.type.name == "dev"
-        assert team.group.resolved_people_uid_list == ("a", "b")
+        assert team.group.resolved_people_uid_list == ["a", "b"]
 
 
-class TestAliasedFields:
-    """Tests for fields with JSON aliases."""
+class TestEmployeeNullCoercion:
+    """Null string fields on an employee record coerce to "".
 
-    def test_repo_info_alias(self):
-        """repo_name in JSON maps to repo in Python."""
-        data = {"repo_name": "my-repo", "description": "A repo"}
-        repo = RepoInfo.model_validate(data)
-        assert repo.repo == "my-repo"
+    Go's json.Unmarshal leaves a null string field as "" and loads the index
+    successfully. The Python consumer must match that: a null uid/full_name/etc.
+    must not raise a ValidationError and abort the entire load.
+    """
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "uid",
+            "full_name",
+            "email",
+            "job_title",
+            "github_id",
+            "manager_uid",
+            "slack_uid",
+            "timezone",
+        ],
+    )
+    def test_null_string_field_coerced_to_empty(self, field: str):
+        emp = _parse_employee({"uid": "u1", "full_name": "Name", field: None})
+        assert getattr(emp, field) == ""
+
+    def test_all_null_strings_at_once(self):
+        emp = _parse_employee(
+            {
+                "uid": None,
+                "full_name": None,
+                "email": None,
+                "job_title": None,
+                "github_id": None,
+                "manager_uid": None,
+                "slack_uid": None,
+                "timezone": None,
+            }
+        )
+        assert emp.uid == ""
+        assert emp.full_name == ""
+        assert emp.email == ""
+
+
+class TestLeafFields:
+    """Tests for leaf model field names (canonical on-disk names, no aliases)."""
+
+    def test_repo_info_uses_repo_name(self):
+        """The on-disk key is repo_name (not repo)."""
+        repo = RepoInfo.model_validate(
+            {"repo_name": "my-repo", "description": "A repo"}
+        )
+        assert repo.repo_name == "my-repo"
         assert repo.description == "A repo"
 
-    def test_repo_info_by_python_name(self):
-        """Can also construct by Python field name."""
-        repo = RepoInfo(repo="my-repo")
-        assert repo.repo == "my-repo"
-
-    def test_group_resolved_roles_alias(self):
-        """resolved_roles in JSON maps to roles in Python."""
-        data = {
-            "type": {"name": "dev"},
-            "resolved_people_uid_list": [],
-            "resolved_roles": [
-                {"people": ["u1"], "roles": ["lead"], "description": ""}
-            ],
-        }
-        group = Group.model_validate(data)
-        assert len(group.roles) == 1
-        assert group.roles[0].people == ("u1",)
+    def test_group_uses_resolved_roles(self):
+        """The group's role list is resolved_roles (not roles)."""
+        group = Group.model_validate(
+            {
+                "type": {"name": "dev"},
+                "resolved_people_uid_list": [],
+                "resolved_roles": [
+                    {"people": ["u1"], "roles": ["lead"], "description": ""}
+                ],
+            }
+        )
+        assert len(group.resolved_roles) == 1
+        assert group.resolved_roles[0].people == ["u1"]
 
 
 class TestModelDump:
     """Tests for model_dump() (model -> dict)."""
 
-    def test_repo_info_dump_by_alias(self):
-        repo = RepoInfo(repo="my-repo", description="desc")
-        d = repo.model_dump(by_alias=True)
+    def test_repo_info_dump(self):
+        repo = RepoInfo(repo_name="my-repo", description="desc")
+        d = repo.model_dump()
         assert d["repo_name"] == "my-repo"
         assert "repo" not in d
 
-    def test_repo_info_dump_by_name(self):
-        repo = RepoInfo(repo="my-repo")
-        d = repo.model_dump()
-        assert d["repo"] == "my-repo"
-
-    def test_group_dump_by_alias(self):
+    def test_group_dump_has_resolved_roles(self):
         group = Group(
             type=GroupType(name="dev"),
-            roles=(RoleInfo(people=("u1",), roles=("lead",)),),
+            resolved_roles=[RoleInfo(people=["u1"], roles=["lead"])],
         )
-        d = group.model_dump(by_alias=True)
+        d = group.model_dump()
         assert "resolved_roles" in d
         assert "roles" not in d
 
 
-class TestComponentNestedValidation:
-    """Tests for Component's model_validator that flattens nested 'component' key."""
+class TestComponentValidation:
+    """Tests for the canonical nested Component shape."""
 
-    def test_flat_format(self):
-        data = {
-            "name": "comp1",
-            "type": "library",
-            "repos": [{"repo_name": "r1"}],
-        }
-        comp = Component.model_validate(data)
-        assert comp.name == "comp1"
-        assert comp.type == "library"
-        assert len(comp.repos) == 1
-        assert comp.repos[0].repo == "r1"
-
-    def test_nested_format(self):
+    def test_nested_component(self):
         data = {
             "name": "comp2",
+            "description": "a component",
+            "repos_list": ["repo-a"],
             "component": {
                 "type": {"name": "service"},
                 "repos": [{"repo_name": "r2"}],
                 "jiras": [{"project": "PROJ", "component": "c1"}],
-                "repos_list": ["repo-a"],
             },
         }
         comp = Component.model_validate(data)
         assert comp.name == "comp2"
-        assert comp.type == "service"
-        assert len(comp.repos) == 1
-        assert comp.repos[0].repo == "r2"
-        assert len(comp.jiras) == 1
-        assert comp.jiras[0].project == "PROJ"
-        assert comp.repos_list == ("repo-a",)
+        assert comp.repos_list == ["repo-a"]
+        assert comp.component is not None
+        assert comp.component.type is not None
+        assert comp.component.type.name == "service"
+        assert len(comp.component.repos) == 1
+        assert comp.component.repos[0].repo_name == "r2"
+        assert len(comp.component.jiras) == 1
+        assert comp.component.jiras[0].project == "PROJ"
 
-    def test_nested_type_string(self):
-        data = {
-            "name": "comp3",
-            "component": {"type": "simple-type"},
-        }
-        comp = Component.model_validate(data)
-        assert comp.type == "simple-type"
-
-    def test_flat_overrides_nested(self):
-        data = {
-            "name": "comp4",
-            "type": "flat-type",
-            "component": {"type": {"name": "nested-type"}},
-        }
-        comp = Component.model_validate(data)
-        assert comp.type == "flat-type"
+    def test_component_minimal(self):
+        comp = Component.model_validate({"name": "comp1"})
+        assert comp.name == "comp1"
+        assert comp.component is None
 
 
 class TestRoundTrip:
@@ -181,8 +193,6 @@ class TestRoundTrip:
             "job_title": "Eng",
             "slack_uid": "U1",
             "github_id": "gh1",
-            "cost_center": 5,
-            "is_people_manager": True,
         }
         emp = Employee.model_validate(data)
         dumped = emp.model_dump()
@@ -191,9 +201,7 @@ class TestRoundTrip:
 
     def test_team_round_trip(self):
         data = {
-            "uid": "t1",
             "name": "Team",
-            "type": "team",
             "group": {
                 "type": {"name": "dev"},
                 "resolved_people_uid_list": ["a"],
@@ -206,7 +214,7 @@ class TestRoundTrip:
             "parent": {"name": "org1", "type": "org"},
         }
         team = Team.model_validate(data)
-        dumped = team.model_dump(by_alias=True)
+        dumped = team.model_dump()
         team2 = Team.model_validate(dumped)
         assert team == team2
 

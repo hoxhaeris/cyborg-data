@@ -39,7 +39,6 @@ def sample_employee_data() -> dict:
                     "slack_uid": "U12345678",
                     "github_id": "jsmith-gh",
                     "manager_uid": "adoe",
-                    "is_people_manager": False,
                 },
                 "adoe": {
                     "uid": "adoe",
@@ -49,7 +48,6 @@ def sample_employee_data() -> dict:
                     "slack_uid": "U87654321",
                     "github_id": "adoe-gh",
                     "manager_uid": "",
-                    "is_people_manager": True,
                 },
             },
             "teams": {},
@@ -147,8 +145,8 @@ class TestRedactingDataSourceRedactedMode:
 
         result = json.load(source.load())
 
-        assert result["lookups"]["employees"]["jsmith"].get("slack_uid") is None
-        assert result["lookups"]["employees"]["adoe"].get("slack_uid") is None
+        assert not result["lookups"]["employees"]["jsmith"].get("slack_uid")
+        assert not result["lookups"]["employees"]["adoe"].get("slack_uid")
 
     def test_redacted_mode_clears_github_id(self, sample_employee_data: dict) -> None:
         """github_id should be cleared."""
@@ -157,8 +155,8 @@ class TestRedactingDataSourceRedactedMode:
 
         result = json.load(source.load())
 
-        assert result["lookups"]["employees"]["jsmith"].get("github_id") is None
-        assert result["lookups"]["employees"]["adoe"].get("github_id") is None
+        assert not result["lookups"]["employees"]["jsmith"].get("github_id")
+        assert not result["lookups"]["employees"]["adoe"].get("github_id")
 
     def test_redacted_mode_preserves_non_pii_fields(
         self, sample_employee_data: dict

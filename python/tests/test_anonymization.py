@@ -66,7 +66,6 @@ def sample_data() -> dict:
                     "slack_uid": "U12345678",
                     "github_id": "jsmith-gh",
                     "manager_uid": "adoe",
-                    "is_people_manager": False,
                 },
                 "adoe": {
                     "uid": "adoe",
@@ -76,14 +75,12 @@ def sample_data() -> dict:
                     "slack_uid": "U87654321",
                     "github_id": "adoe-gh",
                     "manager_uid": "",
-                    "is_people_manager": True,
                 },
             },
             "teams": {
                 "test-squad": {
                     "uid": "test-squad",
                     "name": "Test Squad",
-                    "tab_name": "test-squad",
                     "description": "A test team",
                     "type": "team",
                     "group": {
@@ -98,7 +95,6 @@ def sample_data() -> dict:
                 "test-org": {
                     "uid": "test-org",
                     "name": "Test Org",
-                    "tab_name": "test-org",
                     "description": "A test org",
                     "type": "org",
                     "group": {

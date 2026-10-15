@@ -24,9 +24,7 @@ class TestGetPillarByName:
             lookups=Lookups(
                 pillars={
                     "Engineering": Pillar(
-                        uid="pillar1",
                         name="Engineering",
-                        type="pillar",
                         group=Group(
                             type=GroupType(name="pillar"),
                             resolved_people_uid_list=("user1", "user2"),
@@ -43,7 +41,7 @@ class TestGetPillarByName:
 
         result = service.get_pillar_by_name("Engineering")
         assert result is not None
-        assert result.uid == "pillar1"
+        assert result.name == "Engineering"
 
     def test_get_nonexistent_pillar(self):
         """Test that getting a nonexistent pillar returns None."""
@@ -52,9 +50,7 @@ class TestGetPillarByName:
             lookups=Lookups(
                 pillars={
                     "Engineering": Pillar(
-                        uid="pillar1",
                         name="Engineering",
-                        type="pillar",
                         group=Group(
                             type=GroupType(name="pillar"),
                             resolved_people_uid_list=("user1", "user2"),
@@ -83,11 +79,9 @@ class TestGetAllPillarNames:
             lookups=Lookups(
                 pillars={
                     "Engineering": Pillar(
-                        uid="pillar1",
                         name="Engineering",
                     ),
                     "Product": Pillar(
-                        uid="pillar2",
                         name="Product",
                     ),
                 },

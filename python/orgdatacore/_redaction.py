@@ -173,6 +173,10 @@ def _redact(data: Data) -> Data:
         name: tg.model_copy(update={"group": _redact_group(tg.group)})
         for name, tg in data.lookups.team_groups.items()
     }
+    new_cohorts = {
+        name: c.model_copy(update={"group": _redact_group(c.group)})
+        for name, c in data.lookups.cohorts.items()
+    }
 
     return data.model_copy(
         update={
@@ -183,6 +187,7 @@ def _redact(data: Data) -> Data:
                     "orgs": new_orgs,
                     "pillars": new_pillars,
                     "team_groups": new_team_groups,
+                    "cohorts": new_cohorts,
                 }
             ),
             "indexes": data.indexes.model_copy(
@@ -195,14 +200,14 @@ def _redact(data: Data) -> Data:
     )
 
 
-def _redact_group(group: Group) -> Group:
-    """Return a new Group with escalation contacts redacted."""
-    if not group.escalation:
+def _redact_group(group: Group | None) -> Group | None:
+    """Return a new Group with escalation contacts redacted (None if no group)."""
+    if group is None or not group.escalation:
         return group
-    new_escalation = tuple(
+    new_escalation = [
         contact.model_copy(
             update={"name": "[REDACTED]", "url": "", "description": "[REDACTED]"}
         )
         for contact in group.escalation
-    )
+    ]
     return group.model_copy(update={"escalation": new_escalation})

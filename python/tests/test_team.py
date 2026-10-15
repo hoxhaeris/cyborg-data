@@ -223,11 +223,8 @@ class TestGroupExtendedFields:
             lookups=Lookups(
                 teams={
                     "Backend Team": Team(
-                        uid="team1",
                         name="Backend Team",
-                        tab_name="Backend",
                         description="Backend development team",
-                        type="team",
                         group=Group(
                             type=GroupType(name="team"),
                             resolved_people_uid_list=("user1",),
@@ -247,7 +244,7 @@ class TestGroupExtendedFields:
                                     ),
                                 ),
                             ),
-                            roles=(
+                            resolved_roles=(
                                 RoleInfo(
                                     people=("manager1",),
                                     roles=("manager",),
@@ -263,7 +260,7 @@ class TestGroupExtendedFields:
                             ),
                             repos=(
                                 RepoInfo(
-                                    repo="https://github.com/org/backend",
+                                    repo_name="https://github.com/org/backend",
                                     description="Main backend repo",
                                     types=("source",),
                                 ),
@@ -298,11 +295,12 @@ class TestGroupExtendedFields:
         team = service.get_team_by_name("Backend Team")
         assert team is not None
 
-        assert team.tab_name == "Backend"
+        assert team.name == "Backend Team"
         assert team.description == "Backend development team"
+        assert team.group is not None
         assert team.group.slack is not None
         assert len(team.group.slack.channels) == 1
-        assert len(team.group.roles) == 1
+        assert len(team.group.resolved_roles) == 1
         assert len(team.group.jiras) == 1
         assert len(team.group.repos) == 1
         assert len(team.group.keywords) == 2

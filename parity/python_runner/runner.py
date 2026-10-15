@@ -34,23 +34,14 @@ ENTITY_REGISTRY: dict[str, EntityConfig] = {
         fields=("uid", "full_name", "email"),
         sort_by=("uid",),
     ),
-    "Team": EntityConfig(
-        fields=("uid", "name", "description"),
+    # Teams/orgs/pillars/team_groups are all the canonical HierarchyEntity, which
+    # carries no top-level uid/type (identity moved to stable_id); compare on the
+    # fields both languages share. Go alignment is OCPCRT-659.
+    "HierarchyEntity": EntityConfig(
+        fields=("name", "description"),
         sort_by=("name",),
     ),
-    "Org": EntityConfig(
-        fields=("uid", "name", "description"),
-        sort_by=("name",),
-    ),
-    "Pillar": EntityConfig(
-        fields=("uid", "name", "description"),
-        sort_by=("name",),
-    ),
-    "TeamGroup": EntityConfig(
-        fields=("uid", "name", "description"),
-        sort_by=("name",),
-    ),
-    "Component": EntityConfig(
+    "ComponentEntry": EntityConfig(
         fields=("name", "description"),
         sort_by=("name",),
     ),
@@ -180,9 +171,13 @@ def serialize_entity(entity: Any) -> dict[str, Any]:
         d: dict[str, Any] = {}
         for field_name in config.fields:
             val = getattr(entity, field_name)
-            if isinstance(val, tuple):
+            # Canonical models use list fields (older local models used tuples);
+            # handle both so sorted_list_fields still normalizes ordering.
+            if isinstance(val, (list, tuple)):
                 lst = list(val)
-                d[field_name] = sorted(lst) if field_name in config.sorted_list_fields else lst
+                d[field_name] = (
+                    sorted(lst) if field_name in config.sorted_list_fields else lst
+                )
             else:
                 d[field_name] = val
         return d

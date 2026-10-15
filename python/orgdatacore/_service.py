@@ -18,14 +18,13 @@ from ._types import (
     Employee,
     EntityType,
     EscalationContactInfo,
+    Group,
+    HierarchyEntity,
     HierarchyNode,
     HierarchyPathEntry,
-    Indexes,
     JiraOwnerInfo,
-    Lookups,
     MembershipInfo,
     MembershipType,
-    Metadata,
     Org,
     OrgInfo,
     OrgInfoType,
@@ -85,7 +84,13 @@ def _ancestor_org_info_type(entity_type: EntityType) -> OrgInfoType:
             return OrgInfoType.ORGANIZATION
 
 
-_EMP_NULLABLE = (
+# String fields on an employee record whose JSON null is coerced to "" to match
+# Go's json.Unmarshal zero-value semantics: Go leaves a null string field as ""
+# and loads successfully, so a null uid/full_name/etc. must not raise and abort
+# the entire load on the Python side.
+_EMP_NULL_COERCED = (
+    "uid",
+    "full_name",
     "email",
     "job_title",
     "github_id",
@@ -94,50 +99,48 @@ _EMP_NULLABLE = (
     "timezone",
 )
 
+# An absent group on a hierarchy entity is modelled as None by the canonical
+# schema; queries read through this empty group so they never dereference None.
+_EMPTY_GROUP = Group()
+
+
+def _group(entity: HierarchyEntity) -> Group:
+    """Return the entity's group, or an empty group when the entity has none."""
+    return entity.group if entity.group is not None else _EMPTY_GROUP
+
+
+def _coerce_employee_nulls(raw: Any) -> Any:
+    """Coerce an employee record's null string fields to "" (Go zero-value parity)."""
+    if not isinstance(raw, dict):
+        return raw
+    return {**raw, **{k: (raw.get(k) or "") for k in _EMP_NULL_COERCED}}
+
 
 def _parse_employee(raw: dict[str, Any]) -> Employee:
     """Validate an employee record, coercing null string fields to "" to match Go
-    zero-value semantics (the canonical model types these fields as str | None)."""
-    coerced = {**raw, **{k: (raw.get(k) or "") for k in _EMP_NULLABLE}}
-    return Employee.model_validate(coerced)
+    zero-value semantics."""
+    return Employee.model_validate(_coerce_employee_nulls(raw))
 
 
 def parse_data(raw_data: dict[str, Any]) -> Data:
-    """Parse the complete Data structure from JSON."""
-    metadata = Metadata.model_validate(raw_data.get("metadata", {}))
+    """Parse the complete Data structure from JSON against the canonical models.
 
-    lookups_raw = raw_data.get("lookups", {})
-    lookups = Lookups(
-        employees={
-            k: _parse_employee(v) for k, v in lookups_raw.get("employees", {}).items()
-        },
-        teams={
-            k: Team.model_validate(v) for k, v in lookups_raw.get("teams", {}).items()
-        },
-        orgs={k: Org.model_validate(v) for k, v in lookups_raw.get("orgs", {}).items()},
-        pillars={
-            k: Pillar.model_validate(v)
-            for k, v in lookups_raw.get("pillars", {}).items()
-        },
-        team_groups={
-            k: TeamGroup.model_validate(v)
-            for k, v in lookups_raw.get("team_groups", {}).items()
-        },
-        components={
-            k: Component.model_validate(v)
-            for k, v in lookups_raw.get("components", {}).items()
-        },
-    )
-
-    # The indexes subtree (membership, slack/github mappings, and the bare jira /
-    # component_ownership maps) is the canonical on-disk shape; validate it directly.
-    indexes = Indexes.model_validate(raw_data.get("indexes", {}))
-
-    return Data(
-        metadata=metadata,
-        lookups=lookups,
-        indexes=indexes,
-    )
+    Employee null string fields are coerced to "" before validation (Go
+    zero-value parity); everything else validates directly against the canonical
+    on-disk shape.
+    """
+    raw: dict[str, Any] = dict(raw_data)
+    lookups = raw.get("lookups")
+    if isinstance(lookups, dict):
+        employees = lookups.get("employees")
+        if isinstance(employees, dict):
+            raw["lookups"] = {
+                **lookups,
+                "employees": {
+                    k: _coerce_employee_nulls(v) for k, v in employees.items()
+                },
+            }
+    return Data.model_validate(raw)
 
 
 def _validate_data(data: Data, source: DataSource) -> None:
@@ -260,9 +263,10 @@ class Service:
 
             self._slack_channel_index = {}
             for team in org_data.lookups.teams.values():
-                if team.group.slack is None:
+                slack = _group(team).slack
+                if slack is None:
                     continue
-                for ch in team.group.slack.channels:
+                for ch in slack.channels:
                     if ch.channel:
                         normalized = _normalize_slack_channel(ch.channel)
                         self._slack_channel_index.setdefault(normalized, []).append(
@@ -606,7 +610,7 @@ class Service:
             team = self._data.lookups.teams.get(team_name)
             if team is None:
                 return []
-            return list(team.group.escalation)
+            return list(_group(team).escalation)
 
     def get_org_by_name(self, org_name: str) -> Org | None:
         """Get an organization by name."""
@@ -684,7 +688,7 @@ class Service:
             if not team:
                 return []
             result: list[ComponentOwnership] = []
-            for cr in team.group.component_roles:
+            for cr in _group(team).component_roles:
                 ownership_types: list[str] = []
                 owners = self._data.indexes.component_ownership.get(cr, [])
                 for owner in owners:
@@ -736,7 +740,7 @@ class Service:
 
             return [
                 emp
-                for uid in team.group.resolved_people_uid_list
+                for uid in _group(team).resolved_people_uid_list
                 if (emp := self._data.lookups.employees.get(uid))
             ]
 
@@ -1012,7 +1016,7 @@ class Service:
                 return []
             return [
                 emp
-                for uid in org.group.resolved_people_uid_list
+                for uid in _group(org).resolved_people_uid_list
                 if (emp := self._data.lookups.employees.get(uid))
             ]
 
@@ -1363,7 +1367,7 @@ class Service:
             team = self._data.lookups.teams.get(team_name)
             if team is None:
                 return []
-            return list(team.group.resolved_context)
+            return list(_group(team).resolved_context)
 
     def get_context_for_entity(
         self, entity_name: str, entity_type: str = "team"
@@ -1383,7 +1387,7 @@ class Service:
             entity = self._get_entity_by_type(entity_name, entity_type)
             if entity is None:
                 return []
-            return list(entity.group.resolved_context)
+            return list(_group(entity).resolved_context)
 
     def get_context_by_type(
         self, entity_name: str, context_type: str, entity_type: str = "team"
@@ -1406,7 +1410,7 @@ class Service:
                 return []
             return [
                 item
-                for item in entity.group.resolved_context
+                for item in _group(entity).resolved_context
                 if context_type in item.types
             ]
 
@@ -1430,7 +1434,7 @@ class Service:
                 return []
             seen: set[str] = set()
             result: list[str] = []
-            for item in entity.group.resolved_context:
+            for item in _group(entity).resolved_context:
                 for t in item.types:
                     if t not in seen:
                         seen.add(t)

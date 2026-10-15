@@ -383,12 +383,15 @@ func serializeEmployeeList(emps []orgdatacore.Employee) interface{} {
 	return result
 }
 
+// Hierarchy entities (team/org/pillar/team_group) are compared on {name,
+// description} only: the canonical Python HierarchyEntity carries no top-level
+// uid (identity moved to stable_id). Go keeps Team.UID until OCPCRT-659 aligns
+// the Go structs to the canonical schema, so it is not compared here.
 func serializeTeam(team *orgdatacore.Team) interface{} {
 	if team == nil {
 		return nil
 	}
 	return map[string]interface{}{
-		"uid":         team.UID,
 		"name":        team.Name,
 		"description": team.Description,
 	}
@@ -399,7 +402,6 @@ func serializeOrg(org *orgdatacore.Org) interface{} {
 		return nil
 	}
 	return map[string]interface{}{
-		"uid":         org.UID,
 		"name":        org.Name,
 		"description": org.Description,
 	}
@@ -410,7 +412,6 @@ func serializePillar(pillar *orgdatacore.Pillar) interface{} {
 		return nil
 	}
 	return map[string]interface{}{
-		"uid":         pillar.UID,
 		"name":        pillar.Name,
 		"description": pillar.Description,
 	}
@@ -421,7 +422,6 @@ func serializeTeamGroup(tg *orgdatacore.TeamGroup) interface{} {
 		return nil
 	}
 	return map[string]interface{}{
-		"uid":         tg.UID,
 		"name":        tg.Name,
 		"description": tg.Description,
 	}
@@ -533,8 +533,7 @@ func serializeTeamList(teams []orgdatacore.Team) interface{} {
 	result := make([]map[string]interface{}, len(teams))
 	for i, team := range teams {
 		result[i] = map[string]interface{}{
-			"uid":         team.UID,
-			"name":        team.Name,
+				"name":        team.Name,
 			"description": team.Description,
 		}
 	}
@@ -548,8 +547,7 @@ func serializeOrgList(orgs []orgdatacore.Org) interface{} {
 	result := make([]map[string]interface{}, len(orgs))
 	for i, org := range orgs {
 		result[i] = map[string]interface{}{
-			"uid":         org.UID,
-			"name":        org.Name,
+				"name":        org.Name,
 			"description": org.Description,
 		}
 	}
@@ -563,8 +561,7 @@ func serializePillarList(pillars []orgdatacore.Pillar) interface{} {
 	result := make([]map[string]interface{}, len(pillars))
 	for i, pillar := range pillars {
 		result[i] = map[string]interface{}{
-			"uid":         pillar.UID,
-			"name":        pillar.Name,
+				"name":        pillar.Name,
 			"description": pillar.Description,
 		}
 	}
@@ -578,8 +575,7 @@ func serializeTeamGroupList(tgs []orgdatacore.TeamGroup) interface{} {
 	result := make([]map[string]interface{}, len(tgs))
 	for i, tg := range tgs {
 		result[i] = map[string]interface{}{
-			"uid":         tg.UID,
-			"name":        tg.Name,
+				"name":        tg.Name,
 			"description": tg.Description,
 		}
 	}

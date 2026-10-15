@@ -29,6 +29,7 @@ from ._log import get_logger
 from ._service import (
     _ancestor_org_info_type,
     _EntityRef,
+    _group,
     _NameTypeKey,
     _normalize_slack_channel,
     _to_entity_type,
@@ -170,9 +171,10 @@ class AsyncService:
 
             self._slack_channel_index = {}
             for team in org_data.lookups.teams.values():
-                if team.group.slack is None:
+                slack = _group(team).slack
+                if slack is None:
                     continue
-                for ch in team.group.slack.channels:
+                for ch in slack.channels:
                     if ch.channel:
                         normalized = _normalize_slack_channel(ch.channel)
                         self._slack_channel_index.setdefault(normalized, []).append(
@@ -415,7 +417,7 @@ class AsyncService:
             team = self._data.lookups.teams.get(team_name)
             if team is None:
                 return []
-            return list(team.group.escalation)
+            return list(_group(team).escalation)
 
     async def get_org_by_name(self, org_name: str) -> Org | None:
         """Get an organization by name."""
@@ -1050,7 +1052,7 @@ class AsyncService:
             if not team:
                 return []
             result: list[ComponentOwnership] = []
-            for cr in team.group.component_roles:
+            for cr in _group(team).component_roles:
                 ownership_types: list[str] = []
                 owners = self._data.indexes.component_ownership.get(cr, [])
                 for owner in owners:
@@ -1110,7 +1112,7 @@ class AsyncService:
                 return []
             return [
                 emp
-                for uid in team.group.resolved_people_uid_list
+                for uid in _group(team).resolved_people_uid_list
                 if (emp := self._data.lookups.employees.get(uid))
             ]
 
@@ -1124,7 +1126,7 @@ class AsyncService:
                 return []
             return [
                 emp
-                for uid in org.group.resolved_people_uid_list
+                for uid in _group(org).resolved_people_uid_list
                 if (emp := self._data.lookups.employees.get(uid))
             ]
 
@@ -1227,7 +1229,7 @@ class AsyncService:
             team = self._data.lookups.teams.get(team_name)
             if team is None:
                 return []
-            return list(team.group.resolved_context)
+            return list(_group(team).resolved_context)
 
     async def get_context_for_entity(
         self, entity_name: str, entity_type: str = "team"
@@ -1239,7 +1241,7 @@ class AsyncService:
             entity = self._get_entity_by_type(entity_name, entity_type)
             if entity is None:
                 return []
-            return list(entity.group.resolved_context)
+            return list(_group(entity).resolved_context)
 
     async def get_context_by_type(
         self, entity_name: str, context_type: str, entity_type: str = "team"
@@ -1253,7 +1255,7 @@ class AsyncService:
                 return []
             return [
                 item
-                for item in entity.group.resolved_context
+                for item in _group(entity).resolved_context
                 if context_type in item.types
             ]
 
@@ -1269,7 +1271,7 @@ class AsyncService:
                 return []
             seen: set[str] = set()
             result: list[str] = []
-            for item in entity.group.resolved_context:
+            for item in _group(entity).resolved_context:
                 for t in item.types:
                     if t not in seen:
                         seen.add(t)

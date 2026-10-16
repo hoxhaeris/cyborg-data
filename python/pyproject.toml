@@ -27,7 +27,10 @@ keywords = ["organizational-data", "employees", "teams", "organizations"]
 
 dependencies = [
     "pydantic>=2.0",
-    "orgindex-schema>=0.1.0",
+    # Pre-1.0 and tightly coupled to our model shape, so cap at the next minor:
+    # a 0.2.0 may be breaking (SemVer 0.x) and the schema's additive-only gate
+    # (OCPCRT-662) isn't enforced yet. Raise deliberately when adopting 0.2.
+    "orgindex-schema>=0.1.0,<0.2.0",
 ]
 
 [project.optional-dependencies]

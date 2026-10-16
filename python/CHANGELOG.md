@@ -18,9 +18,11 @@ behavior are unchanged (verified against a real production index — cross-branc
 differential test: 36,348 cases, 0 mismatches).
 
 ### Added
-- `orgindex-schema` is now a **required** dependency (`orgindex-schema>=0.1.0`,
-  published on PyPI). It is pulled in automatically by pip/uv when installing
-  `orgdatacore`; no manual install is needed.
+- `orgindex-schema` is now a **required** dependency
+  (`orgindex-schema>=0.1.0,<0.2.0`, published on PyPI). It is pulled in
+  automatically by pip/uv when installing `orgdatacore`; no manual install is
+  needed. The upper bound caps at the next minor because the schema is pre-1.0
+  (a `0.2.0` may be breaking under SemVer).
 - `Employee.possible_github_ids` field (from the canonical schema).
 - `cohorts` lookup collection on `Lookups`.
 - PII redaction/anonymization now scrub `possible_github_ids` and also cover the

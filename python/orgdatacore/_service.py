@@ -110,10 +110,15 @@ def _group(entity: HierarchyEntity) -> Group:
 
 
 def _coerce_employee_nulls(raw: Any) -> Any:
-    """Coerce an employee record's null string fields to "" (Go zero-value parity)."""
+    """Coerce an employee record's null fields to Go zero values before validation:
+    null strings to "", and a null ``possible_github_ids`` list to [] (Go marshals a
+    nil []string as JSON null, which the non-nullable canonical field would reject)."""
     if not isinstance(raw, dict):
         return raw
-    return {**raw, **{k: (raw.get(k) or "") for k in _EMP_NULL_COERCED}}
+    coerced = {**raw, **{k: (raw.get(k) or "") for k in _EMP_NULL_COERCED}}
+    if "possible_github_ids" in raw and raw["possible_github_ids"] is None:
+        coerced["possible_github_ids"] = []
+    return coerced
 
 
 def _parse_employee(raw: dict[str, Any]) -> Employee:

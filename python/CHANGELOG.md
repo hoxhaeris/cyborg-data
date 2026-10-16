@@ -20,8 +20,10 @@ differential test: 36,348 cases, 0 mismatches).
 ### Added
 - `orgindex-schema` is now a **required** dependency (pinned to `v0.1.0`, a public
   git source). It is pulled in automatically by pip/uv when installing
-  `orgdatacore`; no manual install is needed. (Note: installation now requires
-  network access to GitHub.)
+  `orgdatacore`; no manual install is needed. Caveats: installation now requires
+  network access to GitHub, and because this is a direct git/URL reference the
+  package **cannot be published to PyPI** (PyPI rejects URL/VCS dependencies)
+  until the schema package is published to an index (OCPCRT-664).
 - `Employee.possible_github_ids` field (from the canonical schema).
 - `cohorts` lookup collection on `Lookups`.
 - PII redaction/anonymization now scrub `possible_github_ids` and also cover the

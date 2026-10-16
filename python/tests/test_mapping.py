@@ -88,6 +88,11 @@ class TestEmployeeNullCoercion:
         emp = _parse_employee({"uid": "u1", "full_name": "Name", field: None})
         assert getattr(emp, field) == ""
 
+    def test_null_possible_github_ids_coerced_to_empty_list(self):
+        """A null possible_github_ids (Go nil slice) must coerce to [], not abort load."""
+        emp = _parse_employee({"uid": "u1", "possible_github_ids": None})
+        assert emp.possible_github_ids == []
+
     def test_all_null_strings_at_once(self):
         emp = _parse_employee(
             {

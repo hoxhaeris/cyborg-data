@@ -477,7 +477,7 @@ requires-dist = [
     { name = "google-cloud-storage", marker = "extra == 'gcs'", specifier = ">=2.0.0" },
     { name = "isort", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "orgindex-schema", git = "https://github.com/openshift-eng/orgindex-schema.git?rev=v0.1.0" },
+    { name = "orgindex-schema", specifier = ">=0.1.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
@@ -500,9 +500,13 @@ dev = [
 [[package]]
 name = "orgindex-schema"
 version = "0.1.0"
-source = { git = "https://github.com/openshift-eng/orgindex-schema.git?rev=v0.1.0#9ea3f7aa96c7e4450f77e5fd9508eb272543fc6a" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a5/c0/4a0ea75f16978f642d1e6ed36ff1978fbd8db9b774ac7a470c1a8987c98b/orgindex_schema-0.1.0.tar.gz", hash = "sha256:a7d4bd1a2eef40d189bc3b0808dca892b1b27991c14c53018887940df8bec0e7", size = 28706, upload-time = "2026-10-16T20:17:11.793Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/18/b6/aeac614bbcf11ceb7fd1fe7a8e681f06ff09c37af7d0b4dcc9c7d0a50d79/orgindex_schema-0.1.0-py3-none-any.whl", hash = "sha256:2fc338626d3fc1423a79447c79e852ee1fc65c7c828519ca6809ab3e76486f27", size = 13254, upload-time = "2026-10-16T20:17:10.459Z" },
 ]
 
 [[package]]

@@ -68,6 +68,7 @@ func (s *Service) LoadFromDataSource(ctx context.Context, source DataSource) err
 	if err := json.NewDecoder(reader).Decode(&orgData); err != nil {
 		return NewLoadError(source.String(), fmt.Errorf("failed to parse JSON: %w", err))
 	}
+	normalizeData(&orgData)
 
 	if err := validateData(&orgData); err != nil {
 		return NewLoadError(source.String(), err)
@@ -85,7 +86,7 @@ func (s *Service) LoadFromDataSource(ctx context.Context, source DataSource) err
 
 	s.slackChannelIndex = make(map[string][]string)
 	for _, team := range orgData.Lookups.Teams {
-		if team.Group.Slack == nil {
+		if team.Group == nil || team.Group.Slack == nil {
 			continue
 		}
 		for _, ch := range team.Group.Slack.Channels {
@@ -471,9 +472,11 @@ func (s *Service) GetTeamMembers(teamName string) []Employee {
 	}
 
 	var members []Employee
-	for _, uid := range team.Group.ResolvedPeopleUIDList {
-		if emp, exists := s.data.Lookups.Employees[uid]; exists {
-			members = append(members, emp)
+	if team.Group != nil {
+		for _, uid := range team.Group.ResolvedPeopleUIDList {
+			if emp, exists := s.data.Lookups.Employees[uid]; exists {
+				members = append(members, emp)
+			}
 		}
 	}
 	return members
@@ -1283,9 +1286,11 @@ func (s *Service) GetOrgMembers(orgName string) []Employee {
 		return []Employee{}
 	}
 	var members []Employee
-	for _, uid := range org.Group.ResolvedPeopleUIDList {
-		if emp, exists := s.data.Lookups.Employees[uid]; exists {
-			members = append(members, emp)
+	if org.Group != nil {
+		for _, uid := range org.Group.ResolvedPeopleUIDList {
+			if emp, exists := s.data.Lookups.Employees[uid]; exists {
+				members = append(members, emp)
+			}
 		}
 	}
 	if members == nil {
@@ -1306,7 +1311,7 @@ func (s *Service) GetTeamEscalation(teamName string) []EscalationContactInfo {
 	if !exists {
 		return []EscalationContactInfo{}
 	}
-	if len(team.Group.Escalation) == 0 {
+	if team.Group == nil || len(team.Group.Escalation) == 0 {
 		return []EscalationContactInfo{}
 	}
 	result := make([]EscalationContactInfo, len(team.Group.Escalation))
@@ -1367,19 +1372,19 @@ func (s *Service) getEntityGroup(entityName, entityType string) *Group {
 	switch strings.ToLower(entityType) {
 	case "team":
 		if team, ok := s.data.Lookups.Teams[entityName]; ok {
-			return &team.Group
+			return team.Group
 		}
 	case "org":
 		if org, ok := s.data.Lookups.Orgs[entityName]; ok {
-			return &org.Group
+			return org.Group
 		}
 	case "pillar":
 		if pillar, ok := s.data.Lookups.Pillars[entityName]; ok {
-			return &pillar.Group
+			return pillar.Group
 		}
 	case "team_group":
 		if tg, ok := s.data.Lookups.TeamGroups[entityName]; ok {
-			return &tg.Group
+			return tg.Group
 		}
 	}
 	return nil
@@ -1397,7 +1402,7 @@ func (s *Service) GetContextForTeam(teamName string) []ContextItemInfo {
 	if !exists {
 		return []ContextItemInfo{}
 	}
-	if len(team.Group.ResolvedContext) == 0 {
+	if team.Group == nil || len(team.Group.ResolvedContext) == 0 {
 		return []ContextItemInfo{}
 	}
 	result := make([]ContextItemInfo, len(team.Group.ResolvedContext))
@@ -1484,6 +1489,36 @@ func (s *Service) GetContextTypeDescriptions() map[string]string {
 		result[k] = v
 	}
 	return result
+}
+
+// normalizeData allocates the structural containers the rest of the package
+// treats as always-present. The on-disk schema models metadata, lookups, indexes
+// and the index sub-objects as optional ($ref) fields, so a decoded Data may
+// carry nil pointers. Filling them with empty values restores the invariant that
+// the service, validation, redaction and anonymization code is written against.
+// Nil maps are left as-is: reading or ranging a nil map is already safe.
+func normalizeData(data *Data) {
+	if data == nil {
+		return
+	}
+	if data.Metadata == nil {
+		data.Metadata = &Metadata{}
+	}
+	if data.Lookups == nil {
+		data.Lookups = &Lookups{}
+	}
+	if data.Indexes == nil {
+		data.Indexes = &Indexes{}
+	}
+	if data.Indexes.Membership == nil {
+		data.Indexes.Membership = &MembershipIndex{}
+	}
+	if data.Indexes.SlackIDMappings == nil {
+		data.Indexes.SlackIDMappings = &SlackIDMappings{}
+	}
+	if data.Indexes.GitHubIDMappings == nil {
+		data.Indexes.GitHubIDMappings = &GitHubIDMappings{}
+	}
 }
 
 // validateData checks that required data structures are present.

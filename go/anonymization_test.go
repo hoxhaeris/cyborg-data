@@ -14,27 +14,27 @@ var githubNoncePattern = regexp.MustCompile(`^GITHUB-[a-f0-9]{8}$`)
 // sampleAnonymizationData returns JSON with employees, groups, and indexes.
 func sampleAnonymizationData() string {
 	data := Data{
-		Metadata: Metadata{GeneratedAt: "2025-01-01T10:00:00Z"},
-		Lookups: Lookups{
+		Metadata: &Metadata{GeneratedAt: "2025-01-01T10:00:00Z"},
+		Lookups: &Lookups{
 			Employees: map[string]Employee{
 				"jsmith": {
 					UID: "jsmith", FullName: "John Smith", Email: "jsmith@example.com",
 					JobTitle: "Senior Engineer", SlackUID: "U12345678", GitHubID: "jsmith-gh",
-					ManagerUID: "adoe", IsPeopleManager: false,
+					ManagerUID: "adoe",
 				},
 				"adoe": {
 					UID: "adoe", FullName: "Alice Doe", Email: "adoe@example.com",
 					JobTitle: "Team Lead", SlackUID: "U87654321", GitHubID: "adoe-gh",
-					ManagerUID: "", IsPeopleManager: true,
 				},
 			},
 			Teams: map[string]Team{
 				"test-squad": {
-					UID: "test-squad", Name: "Test Squad", TabName: "test-squad",
-					Description: "A test team", Type: "team",
-					Group: Group{
+					Name:        "Test Squad",
+					Description: "A test team",
+					Group: &Group{
+						Type:                  &GroupType{Name: "team"},
 						ResolvedPeopleUIDList: []string{"jsmith", "adoe"},
-						Roles: []RoleInfo{
+						ResolvedRoles: []RoleInfo{
 							{People: []string{"adoe"}, Roles: []string{"lead"}},
 						},
 					},
@@ -42,31 +42,32 @@ func sampleAnonymizationData() string {
 			},
 			Orgs: map[string]Org{
 				"test-org": {
-					UID: "test-org", Name: "Test Org", TabName: "test-org",
-					Description: "A test org", Type: "org",
-					Group: Group{
+					Name:        "Test Org",
+					Description: "A test org",
+					Group: &Group{
+						Type:                  &GroupType{Name: "org"},
 						ResolvedPeopleUIDList: []string{"jsmith", "adoe"},
-						Roles:                 []RoleInfo{},
+						ResolvedRoles:         []RoleInfo{},
 					},
 				},
 			},
 			Pillars:    map[string]Pillar{},
 			TeamGroups: map[string]TeamGroup{},
 		},
-		Indexes: Indexes{
-			Membership: MembershipIndex{
+		Indexes: &Indexes{
+			Membership: &MembershipIndex{
 				MembershipIndex: map[string][]MembershipInfo{
 					"jsmith": {{Name: "test-squad", Type: "team"}},
 					"adoe":   {{Name: "test-squad", Type: "team"}},
 				},
 			},
-			SlackIDMappings: SlackIDMappings{
+			SlackIDMappings: &SlackIDMappings{
 				SlackUIDToUID: map[string]string{
 					"U12345678": "jsmith",
 					"U87654321": "adoe",
 				},
 			},
-			GitHubIDMappings: GitHubIDMappings{
+			GitHubIDMappings: &GitHubIDMappings{
 				GitHubIDToUID: map[string]string{
 					"jsmith-gh": "jsmith",
 					"adoe-gh":   "adoe",
@@ -312,7 +313,7 @@ func TestAnonymizingDataSourceGroups(t *testing.T) {
 
 	t.Run("roles people remapped", func(t *testing.T) {
 		result, _ := loadAnonymizedJSON(t, sampleAnonymizationData(), PIIModeAnonymized)
-		roles := result.Lookups.Teams["test-squad"].Group.Roles
+		roles := result.Lookups.Teams["test-squad"].Group.ResolvedRoles
 		if len(roles) != 1 {
 			t.Fatalf("expected 1 role, got %d", len(roles))
 		}
@@ -517,10 +518,10 @@ func TestAnonymizingDataSourceStr(t *testing.T) {
 func TestAnonymizingDataSourceEdgeCases(t *testing.T) {
 	t.Run("empty employees", func(t *testing.T) {
 		data := Data{
-			Lookups: Lookups{Employees: map[string]Employee{}},
-			Indexes: Indexes{
-				SlackIDMappings:  SlackIDMappings{SlackUIDToUID: map[string]string{}},
-				GitHubIDMappings: GitHubIDMappings{GitHubIDToUID: map[string]string{}},
+			Lookups: &Lookups{Employees: map[string]Employee{}},
+			Indexes: &Indexes{
+				SlackIDMappings:  &SlackIDMappings{SlackUIDToUID: map[string]string{}},
+				GitHubIDMappings: &GitHubIDMappings{GitHubIDToUID: map[string]string{}},
 			},
 		}
 		b, _ := json.Marshal(data)
@@ -532,7 +533,7 @@ func TestAnonymizingDataSourceEdgeCases(t *testing.T) {
 
 	t.Run("missing indexes", func(t *testing.T) {
 		data := Data{
-			Lookups: Lookups{
+			Lookups: &Lookups{
 				Employees: map[string]Employee{
 					"jsmith": {UID: "jsmith", FullName: "John", Email: "j@x.com"},
 				},

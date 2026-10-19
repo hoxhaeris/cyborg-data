@@ -13,22 +13,22 @@ import (
 //	acme(org, o1) -> shared(team_group, g1) -> shared(team, t1) -> leaf(team, l1)
 func collisionData() *Data {
 	return &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Employees: map[string]Employee{"euser": {UID: "euser"}},
-			Orgs:      map[string]Org{"acme": {Name: "acme", Type: "org", StableID: "o1"}},
+			Orgs:      map[string]Org{"acme": {Name: "acme", StableID: "o1"}},
 			TeamGroups: map[string]TeamGroup{
-				"shared": {Name: "shared", Type: "team_group", StableID: "g1", Parent: &ParentInfo{Name: "acme", Type: "org"}, ParentID: "o1"},
+				"shared": {Name: "shared", StableID: "g1", Parent: &ParentInfo{Name: "acme", Type: "org"}, ParentID: "o1"},
 			},
 			Teams: map[string]Team{
-				"shared": {Name: "shared", Type: "team", StableID: "t1", Parent: &ParentInfo{Name: "shared", Type: "team_group"}, ParentID: "g1"},
-				"leaf":   {Name: "leaf", Type: "team", StableID: "l1", Parent: &ParentInfo{Name: "shared", Type: "team"}, ParentID: "t1"},
+				"shared": {Name: "shared", StableID: "t1", Parent: &ParentInfo{Name: "shared", Type: "team_group"}, ParentID: "g1"},
+				"leaf":   {Name: "leaf", StableID: "l1", Parent: &ParentInfo{Name: "shared", Type: "team"}, ParentID: "t1"},
 			},
 		},
-		Indexes: Indexes{
-			Membership: MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
+		Indexes: &Indexes{
+			Membership: &MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
 				"euser": {{Name: "shared", Type: "team", StableID: "t1"}},
 			}},
-			SlackIDMappings: SlackIDMappings{SlackUIDToUID: map[string]string{"Suser": "euser"}},
+			SlackIDMappings: &SlackIDMappings{SlackUIDToUID: map[string]string{"Suser": "euser"}},
 		},
 	}
 }
@@ -121,18 +121,18 @@ func TestUserOrganizationsStableIDCollision(t *testing.T) {
 // the legacy name+type traversal and still resolves a simple hierarchy.
 func TestBackwardCompatNoStableIDs(t *testing.T) {
 	data := &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Employees: map[string]Employee{"euser": {UID: "euser"}},
-			Orgs:      map[string]Org{"acme": {Name: "acme", Type: "org"}},
+			Orgs:      map[string]Org{"acme": {Name: "acme"}},
 			TeamGroups: map[string]TeamGroup{
-				"grp": {Name: "grp", Type: "team_group", Parent: &ParentInfo{Name: "acme", Type: "org"}},
+				"grp": {Name: "grp", Parent: &ParentInfo{Name: "acme", Type: "org"}},
 			},
 			Teams: map[string]Team{
-				"t": {Name: "t", Type: "team", Parent: &ParentInfo{Name: "grp", Type: "team_group"}},
+				"t": {Name: "t", Parent: &ParentInfo{Name: "grp", Type: "team_group"}},
 			},
 		},
-		Indexes: Indexes{
-			Membership: MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
+		Indexes: &Indexes{
+			Membership: &MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
 				"euser": {{Name: "t", Type: "team"}},
 			}},
 		},
@@ -165,24 +165,24 @@ func TestBackwardCompatNoStableIDs(t *testing.T) {
 func TestUserOrgsAncestryOrderingAndCycles(t *testing.T) {
 	// P(org) <- O(org) <- T(team); membership lists O (direct) before T.
 	ordering := &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Employees: map[string]Employee{"euser": {UID: "euser"}},
 			Orgs: map[string]Org{
-				"P": {Name: "P", Type: "org", StableID: "p1"},
-				"O": {Name: "O", Type: "org", StableID: "o1", Parent: &ParentInfo{Name: "P", Type: "org"}, ParentID: "p1"},
+				"P": {Name: "P", StableID: "p1"},
+				"O": {Name: "O", StableID: "o1", Parent: &ParentInfo{Name: "P", Type: "org"}, ParentID: "p1"},
 			},
 			Teams: map[string]Team{
-				"T": {Name: "T", Type: "team", StableID: "t1", Parent: &ParentInfo{Name: "O", Type: "org"}, ParentID: "o1"},
+				"T": {Name: "T", StableID: "t1", Parent: &ParentInfo{Name: "O", Type: "org"}, ParentID: "o1"},
 			},
 		},
-		Indexes: Indexes{
-			Membership: MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
+		Indexes: &Indexes{
+			Membership: &MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
 				"euser": {
 					{Name: "O", Type: "org", StableID: "o1"},
 					{Name: "T", Type: "team", StableID: "t1"},
 				},
 			}},
-			SlackIDMappings: SlackIDMappings{SlackUIDToUID: map[string]string{"Suser": "euser"}},
+			SlackIDMappings: &SlackIDMappings{SlackUIDToUID: map[string]string{"Suser": "euser"}},
 		},
 	}
 	svc := loadData(t, ordering)
@@ -199,21 +199,21 @@ func TestUserOrgsAncestryOrderingAndCycles(t *testing.T) {
 
 	// Cyclic parents A <-> B, team T under A. Must terminate and include members.
 	cycle := &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Employees: map[string]Employee{"euser": {UID: "euser"}},
 			Orgs: map[string]Org{
-				"A": {Name: "A", Type: "org", StableID: "a1", Parent: &ParentInfo{Name: "B", Type: "org"}, ParentID: "b1"},
-				"B": {Name: "B", Type: "org", StableID: "b1", Parent: &ParentInfo{Name: "A", Type: "org"}, ParentID: "a1"},
+				"A": {Name: "A", StableID: "a1", Parent: &ParentInfo{Name: "B", Type: "org"}, ParentID: "b1"},
+				"B": {Name: "B", StableID: "b1", Parent: &ParentInfo{Name: "A", Type: "org"}, ParentID: "a1"},
 			},
 			Teams: map[string]Team{
-				"T": {Name: "T", Type: "team", StableID: "t1", Parent: &ParentInfo{Name: "A", Type: "org"}, ParentID: "a1"},
+				"T": {Name: "T", StableID: "t1", Parent: &ParentInfo{Name: "A", Type: "org"}, ParentID: "a1"},
 			},
 		},
-		Indexes: Indexes{
-			Membership: MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
+		Indexes: &Indexes{
+			Membership: &MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
 				"euser": {{Name: "T", Type: "team", StableID: "t1"}},
 			}},
-			SlackIDMappings: SlackIDMappings{SlackUIDToUID: map[string]string{"Suser": "euser"}},
+			SlackIDMappings: &SlackIDMappings{SlackUIDToUID: map[string]string{"Suser": "euser"}},
 		},
 	}
 	svc2 := loadData(t, cycle)
@@ -247,17 +247,17 @@ func loadData(t *testing.T, d *Data) *Service {
 // GetUserOrganizations; the unknown ancestor is skipped and the team remains.
 func TestLegacyUnknownParentTypeSkipped(t *testing.T) {
 	data := &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Employees: map[string]Employee{"euser": {UID: "euser"}},
 			Teams: map[string]Team{
-				"t": {Name: "t", Type: "team", Parent: &ParentInfo{Name: "weird", Type: "bogus"}},
+				"t": {Name: "t", Parent: &ParentInfo{Name: "weird", Type: "bogus"}},
 			},
 		},
-		Indexes: Indexes{
-			Membership: MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
+		Indexes: &Indexes{
+			Membership: &MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
 				"euser": {{Name: "t", Type: "team"}},
 			}},
-			SlackIDMappings: SlackIDMappings{SlackUIDToUID: map[string]string{"Suser": "euser"}},
+			SlackIDMappings: &SlackIDMappings{SlackUIDToUID: map[string]string{"Suser": "euser"}},
 		},
 	}
 	b, err := json.Marshal(data)
@@ -294,16 +294,16 @@ func TestMalformedStableIndexFallsBack(t *testing.T) {
 		}
 		return svc
 	}
-	membership := Indexes{Membership: MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
+	membership := &Indexes{Membership: &MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
 		"euser": {{Name: "t", Type: "team"}},
 	}}}
 
 	// Duplicate stable IDs across a team and an org.
 	dup := &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Employees: map[string]Employee{"euser": {UID: "euser"}},
-			Orgs:      map[string]Org{"acme": {Name: "acme", Type: "org", StableID: "dupe"}},
-			Teams:     map[string]Team{"t": {Name: "t", Type: "team", StableID: "dupe"}},
+			Orgs:      map[string]Org{"acme": {Name: "acme", StableID: "dupe"}},
+			Teams:     map[string]Team{"t": {Name: "t", StableID: "dupe"}},
 		},
 		Indexes: membership,
 	}
@@ -313,10 +313,10 @@ func TestMalformedStableIndexFallsBack(t *testing.T) {
 
 	// parent_id pointing to a non-existent entity.
 	dangling := &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Employees: map[string]Employee{"euser": {UID: "euser"}},
 			Teams: map[string]Team{
-				"t": {Name: "t", Type: "team", StableID: "t1", Parent: &ParentInfo{Name: "ghost", Type: "org"}, ParentID: "missing"},
+				"t": {Name: "t", StableID: "t1", Parent: &ParentInfo{Name: "ghost", Type: "org"}, ParentID: "missing"},
 			},
 		},
 		Indexes: membership,

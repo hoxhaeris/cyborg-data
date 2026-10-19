@@ -42,34 +42,33 @@ func (f *FakeDataSource) Close() error {
 
 func CreateTestData() *Data {
 	return &Data{
-		Metadata: Metadata{
+		Metadata: &Metadata{
 			GeneratedAt:    "2024-01-01T00:00:00Z",
 			DataVersion:    "test-v1.0",
 			TotalEmployees: 2,
 			TotalOrgs:      1,
-			TotalTeams:     1,
 		},
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Employees: map[string]Employee{
 				"testuser1": {UID: "testuser1", FullName: "Test User One", Email: "testuser1@example.com", JobTitle: "Test Engineer", SlackUID: "U111111"},
 				"testuser2": {UID: "testuser2", FullName: "Test User Two", Email: "testuser2@example.com", JobTitle: "Test Manager", SlackUID: "U222222"},
 			},
 			Teams: map[string]Team{
-				"test-squad": {UID: "team1", Name: "test-squad", Type: "team", Parent: &ParentInfo{Name: "test-division", Type: "org"}, Group: Group{Type: GroupType{Name: "team"}, ResolvedPeopleUIDList: []string{"testuser1", "testuser2"}}},
+				"test-squad": {Name: "test-squad", Parent: &ParentInfo{Name: "test-division", Type: "org"}, Group: &Group{Type: &GroupType{Name: "team"}, ResolvedPeopleUIDList: []string{"testuser1", "testuser2"}}},
 			},
 			Orgs: map[string]Org{
-				"test-division": {UID: "org1", Name: "test-division", Type: "organization", Group: Group{Type: GroupType{Name: "organization"}, ResolvedPeopleUIDList: []string{"testuser1", "testuser2"}}},
+				"test-division": {Name: "test-division", Group: &Group{Type: &GroupType{Name: "organization"}, ResolvedPeopleUIDList: []string{"testuser1", "testuser2"}}},
 			},
 		},
-		Indexes: Indexes{
-			Membership: MembershipIndex{
+		Indexes: &Indexes{
+			Membership: &MembershipIndex{
 				MembershipIndex: map[string][]MembershipInfo{
 					"testuser1": {{Name: "test-squad", Type: "team"}, {Name: "test-division", Type: "org"}},
 					"testuser2": {{Name: "test-squad", Type: "team"}, {Name: "test-division", Type: "org"}},
 				},
 			},
-			SlackIDMappings:  SlackIDMappings{SlackUIDToUID: map[string]string{"U111111": "testuser1", "U222222": "testuser2"}},
-			GitHubIDMappings: GitHubIDMappings{GitHubIDToUID: map[string]string{"ghuser1": "testuser1", "ghuser2": "testuser2"}},
+			SlackIDMappings:  &SlackIDMappings{SlackUIDToUID: map[string]string{"U111111": "testuser1", "U222222": "testuser2"}},
+			GitHubIDMappings: &GitHubIDMappings{GitHubIDToUID: map[string]string{"ghuser1": "testuser1", "ghuser2": "testuser2"}},
 		},
 	}
 }
@@ -82,12 +81,12 @@ func CreateTestDataJSON() string {
 
 func CreateEmptyTestData() string {
 	data := &Data{
-		Metadata: Metadata{GeneratedAt: "2024-01-01T00:00:00Z", DataVersion: "empty-v1.0"},
-		Lookups:  Lookups{Employees: map[string]Employee{}, Teams: map[string]Team{}, Orgs: map[string]Org{}},
-		Indexes: Indexes{
-			Membership:       MembershipIndex{MembershipIndex: map[string][]MembershipInfo{}},
-			SlackIDMappings:  SlackIDMappings{SlackUIDToUID: map[string]string{}},
-			GitHubIDMappings: GitHubIDMappings{GitHubIDToUID: map[string]string{}},
+		Metadata: &Metadata{GeneratedAt: "2024-01-01T00:00:00Z", DataVersion: "empty-v1.0"},
+		Lookups:  &Lookups{Employees: map[string]Employee{}, Teams: map[string]Team{}, Orgs: map[string]Org{}},
+		Indexes: &Indexes{
+			Membership:       &MembershipIndex{MembershipIndex: map[string][]MembershipInfo{}},
+			SlackIDMappings:  &SlackIDMappings{SlackUIDToUID: map[string]string{}},
+			GitHubIDMappings: &GitHubIDMappings{GitHubIDToUID: map[string]string{}},
 		},
 	}
 	jsonData, _ := json.Marshal(data)

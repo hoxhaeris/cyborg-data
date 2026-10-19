@@ -129,17 +129,17 @@ func TestGetHierarchyPathDeepTeamDetails(t *testing.T) {
 func TestGetHierarchyPathNameCollision(t *testing.T) {
 	service := NewService()
 	service.data = &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Teams: map[string]Team{
-				"shared": {Name: "shared", Type: "team", Parent: &ParentInfo{Name: "shared", Type: "team_group"}},
+				"shared": {Name: "shared", Parent: &ParentInfo{Name: "shared", Type: "team_group"}},
 			},
 			TeamGroups: map[string]TeamGroup{
-				"shared": {Name: "shared", Type: "team_group", Parent: &ParentInfo{Name: "acme", Type: "org"}},
+				"shared": {Name: "shared", Parent: &ParentInfo{Name: "acme", Type: "org"}},
 			},
-			Orgs: map[string]Org{"acme": {Name: "acme", Type: "org"}},
+			Orgs: map[string]Org{"acme": {Name: "acme"}},
 		},
-		Indexes: Indexes{
-			Membership: MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
+		Indexes: &Indexes{
+			Membership: &MembershipIndex{MembershipIndex: map[string][]MembershipInfo{
 				"euser": {{Name: "shared", Type: "team"}},
 			}},
 		},

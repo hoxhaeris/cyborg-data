@@ -9,37 +9,36 @@ import (
 // sampleEmployeeData returns a JSON string matching the Python test fixture.
 func sampleEmployeeData() string {
 	data := Data{
-		Metadata: Metadata{GeneratedAt: "2025-01-01T10:00:00Z"},
-		Lookups: Lookups{
+		Metadata: &Metadata{GeneratedAt: "2025-01-01T10:00:00Z"},
+		Lookups: &Lookups{
 			Employees: map[string]Employee{
 				"jsmith": {
 					UID: "jsmith", FullName: "John Smith", Email: "jsmith@example.com",
 					JobTitle: "Senior Engineer", SlackUID: "U12345678", GitHubID: "jsmith-gh",
-					ManagerUID: "adoe", IsPeopleManager: false,
+					ManagerUID: "adoe",
 				},
 				"adoe": {
 					UID: "adoe", FullName: "Alice Doe", Email: "adoe@example.com",
 					JobTitle: "Team Lead", SlackUID: "U87654321", GitHubID: "adoe-gh",
-					ManagerUID: "", IsPeopleManager: true,
 				},
 			},
 			Teams: map[string]Team{},
 			Orgs:  map[string]Org{},
 		},
-		Indexes: Indexes{
-			Membership: MembershipIndex{
+		Indexes: &Indexes{
+			Membership: &MembershipIndex{
 				MembershipIndex: map[string][]MembershipInfo{
 					"jsmith": {},
 					"adoe":   {},
 				},
 			},
-			SlackIDMappings: SlackIDMappings{
+			SlackIDMappings: &SlackIDMappings{
 				SlackUIDToUID: map[string]string{
 					"U12345678": "jsmith",
 					"U87654321": "adoe",
 				},
 			},
-			GitHubIDMappings: GitHubIDMappings{
+			GitHubIDMappings: &GitHubIDMappings{
 				GitHubIDToUID: map[string]string{
 					"jsmith-gh": "jsmith",
 					"adoe-gh":   "adoe",
@@ -167,9 +166,6 @@ func TestRedactingDataSourceRedactedMode(t *testing.T) {
 		if jsmith.ManagerUID != "adoe" {
 			t.Errorf("ManagerUID = %q, want %q", jsmith.ManagerUID, "adoe")
 		}
-		if jsmith.IsPeopleManager != false {
-			t.Error("IsPeopleManager should be false")
-		}
 	})
 
 	t.Run("preserves metadata", func(t *testing.T) {
@@ -201,10 +197,10 @@ func TestRedactingDataSourceIndexes(t *testing.T) {
 func TestRedactingDataSourceEdgeCases(t *testing.T) {
 	t.Run("empty employees", func(t *testing.T) {
 		data := Data{
-			Lookups: Lookups{Employees: map[string]Employee{}},
-			Indexes: Indexes{
-				SlackIDMappings:  SlackIDMappings{SlackUIDToUID: map[string]string{}},
-				GitHubIDMappings: GitHubIDMappings{GitHubIDToUID: map[string]string{}},
+			Lookups: &Lookups{Employees: map[string]Employee{}},
+			Indexes: &Indexes{
+				SlackIDMappings:  &SlackIDMappings{SlackUIDToUID: map[string]string{}},
+				GitHubIDMappings: &GitHubIDMappings{GitHubIDToUID: map[string]string{}},
 			},
 		}
 		b, _ := json.Marshal(data)
@@ -216,7 +212,7 @@ func TestRedactingDataSourceEdgeCases(t *testing.T) {
 
 	t.Run("missing indexes", func(t *testing.T) {
 		data := Data{
-			Lookups: Lookups{
+			Lookups: &Lookups{
 				Employees: map[string]Employee{
 					"jsmith": {UID: "jsmith", FullName: "John", Email: "j@x.com"},
 				},

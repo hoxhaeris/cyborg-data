@@ -78,13 +78,11 @@ func demonstrateAdvancedQueries(service *orgdatacore.Service, logger *slog.Logge
 
 	if employee := service.GetEmployeeByGitHubID("jsmith-dev"); employee != nil {
 		logger.Info("GitHub ID mapping", "githubID", "jsmith-dev", "uid", employee.UID, "name", employee.FullName)
-		// Show new employee fields
-		if employee.RhatGeo != "" || employee.CostCenter != 0 {
+		// Show additional employee fields
+		if employee.ManagerUID != "" {
 			logger.Info("Employee details",
-				"rhatGeo", employee.RhatGeo,
-				"costCenter", employee.CostCenter,
 				"managerUID", employee.ManagerUID,
-				"isPeopleManager", employee.IsPeopleManager)
+				"timezone", employee.Timezone)
 		}
 	}
 
@@ -107,15 +105,15 @@ func demonstrateAdvancedQueries(service *orgdatacore.Service, logger *slog.Logge
 
 	// Organization, Pillar, and TeamGroup queries
 	if org := service.GetOrgByName("test-org"); org != nil {
-		logger.Info("Organization lookup", "name", org.Name, "type", org.Type)
+		logger.Info("Organization lookup", "name", org.Name, "type", groupTypeName(org.Group))
 	}
 
 	if pillar := service.GetPillarByName("engineering"); pillar != nil {
-		logger.Info("Pillar lookup", "name", pillar.Name, "type", pillar.Type)
+		logger.Info("Pillar lookup", "name", pillar.Name, "type", groupTypeName(pillar.Group))
 	}
 
 	if teamGroup := service.GetTeamGroupByName("backend-teams"); teamGroup != nil {
-		logger.Info("Team group lookup", "name", teamGroup.Name, "type", teamGroup.Type)
+		logger.Info("Team group lookup", "name", teamGroup.Name, "type", groupTypeName(teamGroup.Group))
 	}
 
 	// Organization membership
@@ -146,10 +144,10 @@ func demonstrateAdvancedQueries(service *orgdatacore.Service, logger *slog.Logge
 	}
 	logger.Info("Counted employees via iterator", "count", employeeCount)
 
-	// Find first manager using iterator
+	// Find first employee with a manager using iterator
 	for emp := range service.AllEmployees() {
-		if emp.IsPeopleManager {
-			logger.Info("Found first manager via iterator", "uid", emp.UID, "name", emp.FullName)
+		if emp.ManagerUID != "" {
+			logger.Info("Found first employee with a manager via iterator", "uid", emp.UID, "manager", emp.ManagerUID)
 			break
 		}
 	}
@@ -158,7 +156,7 @@ func demonstrateAdvancedQueries(service *orgdatacore.Service, logger *slog.Logge
 	teamCount := 0
 	for name, team := range service.AllTeams() {
 		if teamCount == 0 {
-			logger.Info("First team from iterator", "name", name, "type", team.Type)
+			logger.Info("First team from iterator", "name", name, "type", groupTypeName(team.Group))
 		}
 		teamCount++
 	}
@@ -246,4 +244,13 @@ func getEnvDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// groupTypeName returns the entity type (team/org/pillar/...), which the canonical
+// schema carries in group.type.name rather than on a top-level field.
+func groupTypeName(g *orgdatacore.Group) string {
+	if g != nil && g.Type != nil {
+		return g.Type.Name
+	}
+	return ""
 }

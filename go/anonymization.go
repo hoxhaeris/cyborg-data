@@ -37,13 +37,13 @@ type AnonymizingDataSource struct {
 	source  DataSource
 	piiMode PIIMode
 
-	mu               sync.Mutex
-	nonceToUID       map[string]string
-	uidToNonce       map[string]string
-	nameToNonce      map[string]string
-	nonceToDisplay   map[string]string
-	slackIDToNonce   map[string]string
-	githubIDToNonce  map[string]string
+	mu              sync.Mutex
+	nonceToUID      map[string]string
+	uidToNonce      map[string]string
+	nameToNonce     map[string]string
+	nonceToDisplay  map[string]string
+	slackIDToNonce  map[string]string
+	githubIDToNonce map[string]string
 }
 
 // NewAnonymizingDataSource wraps a DataSource with PII anonymization.
@@ -74,6 +74,7 @@ func (a *AnonymizingDataSource) Load(ctx context.Context) (io.ReadCloser, error)
 	if err := json.NewDecoder(reader).Decode(&data); err != nil {
 		return nil, fmt.Errorf("anonymizing data source: decode: %w", err)
 	}
+	normalizeData(&data)
 
 	a.mu.Lock()
 	a.anonymize(&data)
@@ -284,34 +285,37 @@ func (a *AnonymizingDataSource) anonymize(data *Data) {
 
 	// Phase 4: Rewrite group people lists in teams/orgs/pillars/team_groups
 	for name, team := range data.Lookups.Teams {
-		a.remapGroup(&team.Group)
+		a.remapGroup(team.Group)
 		data.Lookups.Teams[name] = team
 	}
 	for name, org := range data.Lookups.Orgs {
-		a.remapGroup(&org.Group)
+		a.remapGroup(org.Group)
 		data.Lookups.Orgs[name] = org
 	}
 	for name, pillar := range data.Lookups.Pillars {
-		a.remapGroup(&pillar.Group)
+		a.remapGroup(pillar.Group)
 		data.Lookups.Pillars[name] = pillar
 	}
 	for name, tg := range data.Lookups.TeamGroups {
-		a.remapGroup(&tg.Group)
+		a.remapGroup(tg.Group)
 		data.Lookups.TeamGroups[name] = tg
 	}
 }
 
 func (a *AnonymizingDataSource) remapGroup(g *Group) {
+	if g == nil {
+		return
+	}
 	for i, uid := range g.ResolvedPeopleUIDList {
 		if nonce, ok := a.uidToNonce[uid]; ok {
 			g.ResolvedPeopleUIDList[i] = nonce
 		}
 	}
 
-	for i := range g.Roles {
-		for j, uid := range g.Roles[i].People {
+	for i := range g.ResolvedRoles {
+		for j, uid := range g.ResolvedRoles[i].People {
 			if nonce, ok := a.uidToNonce[uid]; ok {
-				g.Roles[i].People[j] = nonce
+				g.ResolvedRoles[i].People[j] = nonce
 			}
 		}
 	}

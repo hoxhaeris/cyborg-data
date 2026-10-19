@@ -91,6 +91,21 @@ vet-with-gcs:
 	go vet -tags gcs ./...
 .PHONY: vet-with-gcs
 
+# Regenerate index_gen.go from the canonical index schema. The schema is
+# preprocessed first (see hack/prepare_codegen_schema.py) so go-jsonschema emits
+# clean value/pointer types instead of interface{} for the nullable idiom.
+GOJSONSCHEMA_VERSION ?= v0.24.1
+generate:
+	@tmp=$$(mktemp); \
+	python3 hack/prepare_codegen_schema.py index.schema.json "$$tmp"; \
+	go run github.com/atombender/go-jsonschema@$(GOJSONSCHEMA_VERSION) \
+	  --only-models -p orgdatacore --tags json --struct-name-from-title --disable-custom-types-for-maps \
+	  --capitalization UID --capitalization ID --capitalization GitHub --capitalization URL --capitalization PII \
+	  -o index_gen.go "$$tmp"; \
+	rm -f "$$tmp"
+	gofmt -w index_gen.go
+.PHONY: generate
+
 # Clean up
 clean:
 	rm -f example/with-gcs/with-gcs example/with-gcs/with-gcs-stub example/comprehensive/comprehensive

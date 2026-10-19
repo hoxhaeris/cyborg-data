@@ -542,16 +542,13 @@ func TestGetComponentsForTeam(t *testing.T) {
 func TestGroupExtendedFields(t *testing.T) {
 	service := NewService()
 	service.data = &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Teams: map[string]Team{
 				"Backend Team": {
-					UID:         "team1",
 					Name:        "Backend Team",
-					TabName:     "Backend",
 					Description: "Backend development team",
-					Type:        "team",
-					Group: Group{
-						Type: GroupType{
+					Group: &Group{
+						Type: &GroupType{
 							Name: "team",
 						},
 						ResolvedPeopleUIDList: []string{"user1"},
@@ -571,7 +568,7 @@ func TestGroupExtendedFields(t *testing.T) {
 								},
 							},
 						},
-						Roles: []RoleInfo{
+						ResolvedRoles: []RoleInfo{
 							{
 								People: []string{"manager1"},
 								Roles:  []string{"manager"},
@@ -587,7 +584,7 @@ func TestGroupExtendedFields(t *testing.T) {
 						},
 						Repos: []RepoInfo{
 							{
-								Repo:        "https://github.com/org/backend",
+								RepoName:    "https://github.com/org/backend",
 								Description: "Main backend repo",
 								Types:       []string{"source"},
 							},
@@ -619,9 +616,6 @@ func TestGroupExtendedFields(t *testing.T) {
 		t.Fatal("expected team, got nil")
 	}
 
-	if team.TabName != "Backend" {
-		t.Errorf("expected TabName 'Backend', got '%s'", team.TabName)
-	}
 	if team.Description != "Backend development team" {
 		t.Errorf("expected description, got '%s'", team.Description)
 	}
@@ -631,8 +625,8 @@ func TestGroupExtendedFields(t *testing.T) {
 	if len(team.Group.Slack.Channels) != 1 {
 		t.Errorf("expected 1 channel, got %d", len(team.Group.Slack.Channels))
 	}
-	if len(team.Group.Roles) != 1 {
-		t.Errorf("expected 1 role, got %d", len(team.Group.Roles))
+	if len(team.Group.ResolvedRoles) != 1 {
+		t.Errorf("expected 1 role, got %d", len(team.Group.ResolvedRoles))
 	}
 	if len(team.Group.Jiras) != 1 {
 		t.Errorf("expected 1 jira, got %d", len(team.Group.Jiras))

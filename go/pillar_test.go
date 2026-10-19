@@ -7,14 +7,13 @@ import (
 func TestGetPillarByName(t *testing.T) {
 	service := NewService()
 	service.data = &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Pillars: map[string]Pillar{
 				"Engineering": {
-					UID:  "pillar1",
-					Name: "Engineering",
-					Type: "pillar",
-					Group: Group{
-						Type: GroupType{
+					StableID: "pillar1",
+					Name:     "Engineering",
+					Group: &Group{
+						Type: &GroupType{
 							Name: "pillar",
 						},
 						ResolvedPeopleUIDList: []string{"user1", "user2"},
@@ -25,16 +24,16 @@ func TestGetPillarByName(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		pillarName  string
-		expectNil   bool
-		expectedUID string
+		name             string
+		pillarName       string
+		expectNil        bool
+		expectedStableID string
 	}{
 		{
-			name:        "existing pillar",
-			pillarName:  "Engineering",
-			expectNil:   false,
-			expectedUID: "pillar1",
+			name:             "existing pillar",
+			pillarName:       "Engineering",
+			expectNil:        false,
+			expectedStableID: "pillar1",
 		},
 		{
 			name:       "nonexistent pillar",
@@ -53,8 +52,8 @@ func TestGetPillarByName(t *testing.T) {
 			} else {
 				if result == nil {
 					t.Errorf("expected pillar, got nil")
-				} else if result.UID != tt.expectedUID {
-					t.Errorf("expected UID %s, got %s", tt.expectedUID, result.UID)
+				} else if result.StableID != tt.expectedStableID {
+					t.Errorf("expected StableID %s, got %s", tt.expectedStableID, result.StableID)
 				}
 			}
 		})
@@ -64,15 +63,15 @@ func TestGetPillarByName(t *testing.T) {
 func TestGetAllPillarNames(t *testing.T) {
 	service := NewService()
 	service.data = &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Pillars: map[string]Pillar{
 				"Engineering": {
-					UID:  "pillar1",
-					Name: "Engineering",
+					StableID: "pillar1",
+					Name:     "Engineering",
 				},
 				"Product": {
-					UID:  "pillar2",
-					Name: "Product",
+					StableID: "pillar2",
+					Name:     "Product",
 				},
 			},
 		},

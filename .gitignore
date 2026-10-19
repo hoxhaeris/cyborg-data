@@ -34,3 +34,14 @@ Thumbs.db
 
 # Example binaries
 example/example
+/go/example/comprehensive/comprehensive
+/go/example/with-gcs/with-gcs
+/go/example/with-gcs/with-gcs-stub
+
+# Parity runner binaries (built by scripts/validate-api-parity.sh)
+/parity/go_runner/go_runner
+/parity/go_runner/runner
+
+# Python caches
+__pycache__/
+*.pyc

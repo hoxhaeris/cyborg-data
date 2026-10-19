@@ -52,6 +52,7 @@ func (r *RedactingDataSource) Load(ctx context.Context) (io.ReadCloser, error) {
 	if err := json.NewDecoder(reader).Decode(&data); err != nil {
 		return nil, fmt.Errorf("redacting data source: decode: %w", err)
 	}
+	normalizeData(&data)
 
 	redactPII(&data)
 

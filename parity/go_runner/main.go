@@ -178,41 +178,41 @@ func buildArgs(methodName string, methodType reflect.Type, inputs map[string]int
 // methodParamNames maps Go methods to parameter names (in Python snake_case).
 // Required because Go reflection doesn't expose parameter names.
 var methodParamNames = map[string][]string{
-	"GetEmployeeByUID":       {"uid"},
-	"GetEmployeeBySlackID":   {"slack_id"},
-	"GetEmployeeByGitHubID":  {"github_id"},
-	"GetEmployeeByEmail":     {"email"},
-	"GetManagerForEmployee":  {"uid"},
-	"GetTeamByName":          {"team_name"},
-	"GetOrgByName":           {"org_name"},
-	"GetPillarByName":        {"pillar_name"},
-	"GetTeamGroupByName":     {"team_group_name"},
-	"GetTeamsForUID":         {"uid"},
-	"GetTeamsForSlackID":     {"slack_id"},
-	"GetTeamMembers":         {"team_name"},
-	"GetUserOrganizations":   {"slack_id"},
-	"GetDescendantsTree":     {"name"},
-	"GetComponentByName":     {"name"},
-	"GetJiraComponents":      {"project"},
-	"GetTeamsByJiraProject":  {"project"},
-	"GetJiraOwnershipForTeam": {"team_name"},
-	"GetUserMemberships":     {"uid"},
-	"GetUserTeams":           {"uid"},
-	"GetOrgMembers":          {"org_name"},
-	"GetTeamEscalation":      {"team_name"},
-	"GetTeamsForComponent":   {"component_name"},
-	"GetComponentsForTeam":   {"team_name"},
-	"IsEmployeeInTeam":       {"uid", "team_name"},
-	"IsSlackUserInTeam":      {"slack_id", "team_name"},
-	"IsEmployeeInOrg":        {"uid", "org_name"},
-	"IsSlackUserInOrg":       {"slack_id", "org_name"},
-	"GetHierarchyPath":             {"name", "entity_type"},
-	"GetTeamsByJiraComponent":      {"project", "component"},
-	"GetContextForTeam":            {"team_name"},
-	"GetContextForEntity":          {"entity_name", "entity_type"},
-	"GetContextByType":             {"entity_name", "context_type", "entity_type"},
-	"GetAllContextTypesForEntity":  {"entity_name", "entity_type"},
-	"GetContextTypeDescriptions":   {},
+	"GetEmployeeByUID":            {"uid"},
+	"GetEmployeeBySlackID":        {"slack_id"},
+	"GetEmployeeByGitHubID":       {"github_id"},
+	"GetEmployeeByEmail":          {"email"},
+	"GetManagerForEmployee":       {"uid"},
+	"GetTeamByName":               {"team_name"},
+	"GetOrgByName":                {"org_name"},
+	"GetPillarByName":             {"pillar_name"},
+	"GetTeamGroupByName":          {"team_group_name"},
+	"GetTeamsForUID":              {"uid"},
+	"GetTeamsForSlackID":          {"slack_id"},
+	"GetTeamMembers":              {"team_name"},
+	"GetUserOrganizations":        {"slack_id"},
+	"GetDescendantsTree":          {"name"},
+	"GetComponentByName":          {"name"},
+	"GetJiraComponents":           {"project"},
+	"GetTeamsByJiraProject":       {"project"},
+	"GetJiraOwnershipForTeam":     {"team_name"},
+	"GetUserMemberships":          {"uid"},
+	"GetUserTeams":                {"uid"},
+	"GetOrgMembers":               {"org_name"},
+	"GetTeamEscalation":           {"team_name"},
+	"GetTeamsForComponent":        {"component_name"},
+	"GetComponentsForTeam":        {"team_name"},
+	"IsEmployeeInTeam":            {"uid", "team_name"},
+	"IsSlackUserInTeam":           {"slack_id", "team_name"},
+	"IsEmployeeInOrg":             {"uid", "org_name"},
+	"IsSlackUserInOrg":            {"slack_id", "org_name"},
+	"GetHierarchyPath":            {"name", "entity_type"},
+	"GetTeamsByJiraComponent":     {"project", "component"},
+	"GetContextForTeam":           {"team_name"},
+	"GetContextForEntity":         {"entity_name", "entity_type"},
+	"GetContextByType":            {"entity_name", "context_type", "entity_type"},
+	"GetAllContextTypesForEntity": {"entity_name", "entity_type"},
+	"GetContextTypeDescriptions":  {},
 }
 
 func inferParamNames(methodName string, methodType reflect.Type) []string {
@@ -237,16 +237,16 @@ func matchesParamName(inputKey, paramName string, paramType reflect.Type) bool {
 	}
 
 	mappings := map[string][]string{
-		"uid":       {"uid", "employee_uid"},
-		"slackID":   {"slack_id", "slackID"},
-		"githubID":  {"github_id", "githubID"},
-		"teamName":  {"team_name", "teamName", "team"},
-		"orgName":   {"org_name", "orgName", "org"},
+		"uid":        {"uid", "employee_uid"},
+		"slackID":    {"slack_id", "slackID"},
+		"githubID":   {"github_id", "githubID"},
+		"teamName":   {"team_name", "teamName", "team"},
+		"orgName":    {"org_name", "orgName", "org"},
 		"pillarName": {"pillar_name", "pillarName", "pillar"},
-		"name":      {"name", "entity_name"},
-		"email":     {"email"},
-		"project":   {"project", "jira_project"},
-		"component": {"component", "jira_component"},
+		"name":       {"name", "entity_name"},
+		"email":      {"email"},
+		"project":    {"project", "jira_project"},
+		"component":  {"component", "jira_component"},
 	}
 
 	for goName, pythonNames := range mappings {
@@ -305,14 +305,8 @@ func serializeOutput(output interface{}) interface{} {
 		return serializeEmployee(val)
 	case []orgdatacore.Employee:
 		return serializeEmployeeList(val)
-	case *orgdatacore.Team:
-		return serializeTeam(val)
-	case *orgdatacore.Org:
-		return serializeOrg(val)
-	case *orgdatacore.Pillar:
-		return serializePillar(val)
-	case *orgdatacore.TeamGroup:
-		return serializeTeamGroup(val)
+	case *orgdatacore.HierarchyEntity:
+		return serializeHierarchyEntity(val)
 	case *orgdatacore.Component:
 		return serializeComponent(val)
 	case []orgdatacore.Component:
@@ -327,14 +321,8 @@ func serializeOutput(output interface{}) interface{} {
 		return serializeJiraOwnerList(val)
 	case []orgdatacore.JiraOwnership:
 		return serializeJiraOwnershipList(val)
-	case []orgdatacore.Team:
-		return serializeTeamList(val)
-	case []orgdatacore.Org:
-		return serializeOrgList(val)
-	case []orgdatacore.Pillar:
-		return serializePillarList(val)
-	case []orgdatacore.TeamGroup:
-		return serializeTeamGroupList(val)
+	case []orgdatacore.HierarchyEntity:
+		return serializeHierarchyEntityList(val)
 	case []orgdatacore.MembershipInfo:
 		return serializeMembershipInfoList(val)
 	case []orgdatacore.EscalationContactInfo:
@@ -383,47 +371,16 @@ func serializeEmployeeList(emps []orgdatacore.Employee) interface{} {
 	return result
 }
 
-// Hierarchy entities (team/org/pillar/team_group) are compared on {name,
-// description} only: the canonical Python HierarchyEntity carries no top-level
-// uid (identity moved to stable_id). Go keeps Team.UID until OCPCRT-659 aligns
-// the Go structs to the canonical schema, so it is not compared here.
-func serializeTeam(team *orgdatacore.Team) interface{} {
-	if team == nil {
+// Hierarchy entities (team/org/pillar/team_group) are a single on-disk type and
+// are compared on {name, description} only: the canonical HierarchyEntity carries
+// no top-level uid (identity lives in stable_id, which is not compared here).
+func serializeHierarchyEntity(entity *orgdatacore.HierarchyEntity) interface{} {
+	if entity == nil {
 		return nil
 	}
 	return map[string]interface{}{
-		"name":        team.Name,
-		"description": team.Description,
-	}
-}
-
-func serializeOrg(org *orgdatacore.Org) interface{} {
-	if org == nil {
-		return nil
-	}
-	return map[string]interface{}{
-		"name":        org.Name,
-		"description": org.Description,
-	}
-}
-
-func serializePillar(pillar *orgdatacore.Pillar) interface{} {
-	if pillar == nil {
-		return nil
-	}
-	return map[string]interface{}{
-		"name":        pillar.Name,
-		"description": pillar.Description,
-	}
-}
-
-func serializeTeamGroup(tg *orgdatacore.TeamGroup) interface{} {
-	if tg == nil {
-		return nil
-	}
-	return map[string]interface{}{
-		"name":        tg.Name,
-		"description": tg.Description,
+		"name":        entity.Name,
+		"description": entity.Description,
 	}
 }
 
@@ -529,54 +486,12 @@ func serializeJiraOwnershipList(ownerships []orgdatacore.JiraOwnership) interfac
 	return result
 }
 
-func serializeTeamList(teams []orgdatacore.Team) interface{} {
-	result := make([]map[string]interface{}, len(teams))
-	for i, team := range teams {
+func serializeHierarchyEntityList(entities []orgdatacore.HierarchyEntity) interface{} {
+	result := make([]map[string]interface{}, len(entities))
+	for i, entity := range entities {
 		result[i] = map[string]interface{}{
-				"name":        team.Name,
-			"description": team.Description,
-		}
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i]["name"].(string) < result[j]["name"].(string)
-	})
-	return result
-}
-
-func serializeOrgList(orgs []orgdatacore.Org) interface{} {
-	result := make([]map[string]interface{}, len(orgs))
-	for i, org := range orgs {
-		result[i] = map[string]interface{}{
-				"name":        org.Name,
-			"description": org.Description,
-		}
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i]["name"].(string) < result[j]["name"].(string)
-	})
-	return result
-}
-
-func serializePillarList(pillars []orgdatacore.Pillar) interface{} {
-	result := make([]map[string]interface{}, len(pillars))
-	for i, pillar := range pillars {
-		result[i] = map[string]interface{}{
-				"name":        pillar.Name,
-			"description": pillar.Description,
-		}
-	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i]["name"].(string) < result[j]["name"].(string)
-	})
-	return result
-}
-
-func serializeTeamGroupList(tgs []orgdatacore.TeamGroup) interface{} {
-	result := make([]map[string]interface{}, len(tgs))
-	for i, tg := range tgs {
-		result[i] = map[string]interface{}{
-				"name":        tg.Name,
-			"description": tg.Description,
+			"name":        entity.Name,
+			"description": entity.Description,
 		}
 	}
 	sort.Slice(result, func(i, j int) bool {
@@ -637,7 +552,7 @@ func serializeComponentOwnershipList(ownerships []orgdatacore.ComponentOwnership
 	result := make([]map[string]interface{}, len(ownerships))
 	for i, ownership := range ownerships {
 		result[i] = map[string]interface{}{
-			"component":      ownership.Component,
+			"component":       ownership.Component,
 			"ownership_types": ownership.OwnershipTypes,
 		}
 	}

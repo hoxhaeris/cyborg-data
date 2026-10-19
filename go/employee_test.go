@@ -32,14 +32,13 @@ func TestGetEmployeeByUID(t *testing.T) {
 			name: "existing employee adoe",
 			uid:  "adoe",
 			expected: &Employee{
-				UID:             "adoe",
-				FullName:        "Alice Doe",
-				Email:           "adoe@example.com",
-				JobTitle:        "Team Lead",
-				SlackUID:        "U87654321",
-				GitHubID:        "alice-codes",
-				IsPeopleManager: true,
-				Timezone:        "America/Los_Angeles",
+				UID:      "adoe",
+				FullName: "Alice Doe",
+				Email:    "adoe@example.com",
+				JobTitle: "Team Lead",
+				SlackUID: "U87654321",
+				GitHubID: "alice-codes",
+				Timezone: "America/Los_Angeles",
 			},
 		},
 		{
@@ -296,19 +295,17 @@ func TestGitHubIDMapping(t *testing.T) {
 func TestNewEmployeeFields(t *testing.T) {
 	service := NewService()
 	service.data = &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			Employees: map[string]Employee{
 				"testuser": {
-					UID:             "testuser",
-					FullName:        "Test User",
-					Email:           "test@example.com",
-					JobTitle:        "Engineer",
-					SlackUID:        "U123",
-					GitHubID:        "testgithub",
-					RhatGeo:         "NA",
-					CostCenter:      12345,
-					ManagerUID:      "manager1",
-					IsPeopleManager: false,
+					UID:        "testuser",
+					FullName:   "Test User",
+					Email:      "test@example.com",
+					JobTitle:   "Engineer",
+					SlackUID:   "U123",
+					GitHubID:   "testgithub",
+					ManagerUID: "manager1",
+					Timezone:   "US/Eastern",
 				},
 			},
 		},
@@ -322,17 +319,17 @@ func TestNewEmployeeFields(t *testing.T) {
 	if emp.GitHubID != "testgithub" {
 		t.Errorf("expected GitHubID 'testgithub', got '%s'", emp.GitHubID)
 	}
-	if emp.RhatGeo != "NA" {
-		t.Errorf("expected RhatGeo 'NA', got '%s'", emp.RhatGeo)
+	if emp.Email != "test@example.com" {
+		t.Errorf("expected Email 'test@example.com', got '%s'", emp.Email)
 	}
-	if emp.CostCenter != 12345 {
-		t.Errorf("expected CostCenter 12345, got %d", emp.CostCenter)
+	if emp.JobTitle != "Engineer" {
+		t.Errorf("expected JobTitle 'Engineer', got '%s'", emp.JobTitle)
 	}
 	if emp.ManagerUID != "manager1" {
 		t.Errorf("expected ManagerUID 'manager1', got '%s'", emp.ManagerUID)
 	}
-	if emp.IsPeopleManager != false {
-		t.Errorf("expected IsPeopleManager false, got %v", emp.IsPeopleManager)
+	if emp.Timezone != "US/Eastern" {
+		t.Errorf("expected Timezone 'US/Eastern', got '%s'", emp.Timezone)
 	}
 }
 
@@ -349,14 +346,13 @@ func TestGetManagerForEmployee(t *testing.T) {
 			name: "employee with manager",
 			uid:  "jsmith",
 			expectedManager: &Employee{
-				UID:             "adoe",
-				FullName:        "Alice Doe",
-				Email:           "adoe@example.com",
-				JobTitle:        "Team Lead",
-				SlackUID:        "U87654321",
-				GitHubID:        "alice-codes",
-				IsPeopleManager: true,
-				Timezone:        "America/Los_Angeles",
+				UID:      "adoe",
+				FullName: "Alice Doe",
+				Email:    "adoe@example.com",
+				JobTitle: "Team Lead",
+				SlackUID: "U87654321",
+				GitHubID: "alice-codes",
+				Timezone: "America/Los_Angeles",
 			},
 		},
 		{
@@ -418,14 +414,13 @@ func TestGetEmployeeByEmail(t *testing.T) {
 			name:  "existing email for adoe",
 			email: "adoe@example.com",
 			expected: &Employee{
-				UID:             "adoe",
-				FullName:        "Alice Doe",
-				Email:           "adoe@example.com",
-				JobTitle:        "Team Lead",
-				SlackUID:        "U87654321",
-				GitHubID:        "alice-codes",
-				IsPeopleManager: true,
-				Timezone:        "America/Los_Angeles",
+				UID:      "adoe",
+				FullName: "Alice Doe",
+				Email:    "adoe@example.com",
+				JobTitle: "Team Lead",
+				SlackUID: "U87654321",
+				GitHubID: "alice-codes",
+				Timezone: "America/Los_Angeles",
 			},
 		},
 		{

@@ -7,14 +7,13 @@ import (
 func TestGetTeamGroupByName(t *testing.T) {
 	service := NewService()
 	service.data = &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			TeamGroups: map[string]TeamGroup{
 				"Platform Teams": {
-					UID:  "tg1",
-					Name: "Platform Teams",
-					Type: "team_group",
-					Group: Group{
-						Type: GroupType{
+					StableID: "tg1",
+					Name:     "Platform Teams",
+					Group: &Group{
+						Type: &GroupType{
 							Name: "team_group",
 						},
 						ResolvedPeopleUIDList: []string{"user1", "user2"},
@@ -25,16 +24,16 @@ func TestGetTeamGroupByName(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		teamGroupName string
-		expectNil     bool
-		expectedUID   string
+		name             string
+		teamGroupName    string
+		expectNil        bool
+		expectedStableID string
 	}{
 		{
-			name:          "existing team group",
-			teamGroupName: "Platform Teams",
-			expectNil:     false,
-			expectedUID:   "tg1",
+			name:             "existing team group",
+			teamGroupName:    "Platform Teams",
+			expectNil:        false,
+			expectedStableID: "tg1",
 		},
 		{
 			name:          "nonexistent team group",
@@ -53,8 +52,8 @@ func TestGetTeamGroupByName(t *testing.T) {
 			} else {
 				if result == nil {
 					t.Errorf("expected team group, got nil")
-				} else if result.UID != tt.expectedUID {
-					t.Errorf("expected UID %s, got %s", tt.expectedUID, result.UID)
+				} else if result.StableID != tt.expectedStableID {
+					t.Errorf("expected StableID %s, got %s", tt.expectedStableID, result.StableID)
 				}
 			}
 		})
@@ -64,15 +63,15 @@ func TestGetTeamGroupByName(t *testing.T) {
 func TestGetAllTeamGroupNames(t *testing.T) {
 	service := NewService()
 	service.data = &Data{
-		Lookups: Lookups{
+		Lookups: &Lookups{
 			TeamGroups: map[string]TeamGroup{
 				"Platform Teams": {
-					UID:  "tg1",
-					Name: "Platform Teams",
+					StableID: "tg1",
+					Name:     "Platform Teams",
 				},
 				"Product Teams": {
-					UID:  "tg2",
-					Name: "Product Teams",
+					StableID: "tg2",
+					Name:     "Product Teams",
 				},
 			},
 		},

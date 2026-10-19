@@ -62,7 +62,7 @@ __version_info__: Final[tuple[int, int, int]] = _parse_version(__version__)
 
 # API version for compatibility checking
 # This may differ from package version for API stability.
-# Bumped to 2.0 for the canonical-model adoption (OCPCRT-658): the on-disk model
+# Bumped to 2.0 for the canonical-model adoption: the on-disk model
 # shape changed (dropped/renamed Employee and hierarchy fields, nested Component,
 # removed JiraIndex/ComponentOwnershipIndex exports), a breaking API change.
 API_VERSION: Final[str] = "2.0"

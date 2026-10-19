@@ -2,7 +2,7 @@
 
 The on-disk *comprehensive index* models (metadata, lookups, entities, indexes,
 and all their nested leaf types) are the canonical ``orgindex-schema`` models,
-re-exported here under the historical ``orgdatacore`` names (OCPCRT-658). The
+re-exported here under the historical ``orgdatacore`` names. The
 five hierarchy collections (teams/orgs/pillars/team_groups/cohorts) are
 structurally identical, so ``Team``/``Org``/``Pillar``/``TeamGroup`` all alias
 the single canonical :class:`HierarchyEntity`.
@@ -221,7 +221,7 @@ class GCSConfig(BaseModel):
 
 __all__ = [
     # Canonical on-disk index models, re-exported from orgindex-schema under the
-    # historical orgdatacore names (OCPCRT-658). Team/Org/Pillar/TeamGroup all
+    # historical orgdatacore names. Team/Org/Pillar/TeamGroup all
     # alias the single canonical HierarchyEntity.
     "Data",
     "Lookups",

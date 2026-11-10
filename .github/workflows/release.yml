@@ -36,7 +36,9 @@ jobs:
         run: |
           uv run --extra dev ruff check .
           uv run --extra dev mypy orgdatacore
-          uv run --extra dev pytest
+          # Install the gcs extra too so the suite exercises the shipped [gcs]
+          # path (google-cloud-storage) rather than skipping those tests.
+          uv run --extra dev --extra gcs pytest
 
       # Parse the tag with PEP 440 semantics (not shell globs) to classify
       # pre-release vs final reliably. Strips the python-v prefix first, and

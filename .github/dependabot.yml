@@ -1,0 +1,42 @@
+version: 2
+updates:
+  # Keep GitHub Actions pinned by SHA and up to date (security-relevant).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    # One batched PR per run instead of one per action.
+    groups:
+      github-actions:
+        patterns: ["*"]
+    # Let a release settle before proposing it. (semver-*-days is not supported
+    # for the github-actions ecosystem, so a single default is used.)
+    cooldown:
+      default-days: 7
+
+  # Watch the Python package's dependencies. Uses the `uv` ecosystem so updates
+  # cover uv.lock alongside pyproject.toml (the `pip` ecosystem leaves uv.lock
+  # stale). Dev tooling (ruff/mypy/pytest) is bumped by hand to control linting
+  # churn, so only routine version bumps are ignored below (security updates still flow).
+  - package-ecosystem: uv
+    directory: "/python"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"
+    groups:
+      python:
+        patterns: ["*"]
+    cooldown:
+      default-days: 7
+    ignore:
+      # Ignore only routine version bumps; Dependabot security-update PRs still
+      # come through (ruff/mypy/pytest run in the release gate).
+      - dependency-name: "ruff"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "mypy"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "pytest"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]

@@ -439,7 +439,6 @@ wheels = [
 
 [[package]]
 name = "orgdatacore"
-version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "orgindex-schema" },
@@ -484,7 +483,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
 ]
-provides-extras = ["gcs", "dev"]
+provides-extras = ["dev", "gcs"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -1,0 +1,128 @@
+name: Release
+
+# Tag-driven releases for the Python package (orgdatacore). Push an annotated,
+# signed tag to publish:
+#   python-v1.2.3     -> build, gate, publish to PyPI, cut a GitHub Release
+#   python-v1.2.3rc1  -> build, gate, publish to TestPyPI only (dry run)
+# Publishing uses PyPI Trusted Publishing (OIDC) — no API tokens are stored.
+# The package lives in python/; the python-v prefix keeps these tags from
+# colliding with the repo's Go tags. See python/RELEASING.md.
+on:
+  push:
+    tags: ["python-v*"]
+
+# Deny by default; each job elevates to only what it needs.
+permissions: {}
+
+jobs:
+  build:
+    name: build & verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      prerelease: ${{ steps.classify.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # hatch-vcs derives the version from the tag; full history + tags needed.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      # Never publish a red tree: run the same gate Prow runs on every PR.
+      - name: Gate (lint, type-check, test)
+        working-directory: python
+        run: |
+          uv run --extra dev ruff check .
+          uv run --extra dev mypy orgdatacore
+          uv run --extra dev pytest
+
+      # Parse the tag with PEP 440 semantics (not shell globs) to classify
+      # pre-release vs final reliably. Strips the python-v prefix first.
+      - name: Classify tag
+        id: classify
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          uv run --with packaging python - <<'PY'
+          import os, sys
+          from packaging.version import Version, InvalidVersion
+
+          raw = os.environ["TAG_NAME"].removeprefix("python-").removeprefix("v")
+          try:
+              pkg = Version(raw)
+          except InvalidVersion as exc:
+              sys.exit(f"::error::tag '{raw}' is not a valid PEP 440 version: {exc}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"prerelease={'true' if pkg.is_prerelease else 'false'}\n")
+          print(f"tag={pkg} prerelease={pkg.is_prerelease}")
+          PY
+
+      - name: Build
+        working-directory: python
+        run: uv build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: python/dist/
+
+  testpypi:
+    name: publish to TestPyPI
+    needs: build
+    if: needs.build.outputs.prerelease == 'true'
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write # OIDC for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          attestations: true
+
+  pypi:
+    name: publish to PyPI
+    needs: build
+    if: needs.build.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # OIDC for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          attestations: true
+
+  github-release:
+    name: GitHub Release
+    needs: [build, pypi]
+    if: needs.build.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes

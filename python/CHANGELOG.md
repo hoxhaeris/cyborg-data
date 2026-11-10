@@ -61,5 +61,5 @@ differential test: 36,348 cases, 0 mismatches).
 Initial tracked release (pre-canonical models). Hand-maintained pydantic models
 describing the on-disk index, consumed by `Service`.
 
-[Unreleased]: https://github.com/openshift-eng/cyborg-data/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/openshift-eng/cyborg-data/compare/v1.0.0...v2.0.0
+[Unreleased]: https://github.com/openshift-eng/cyborg-data/compare/python-v2.0.0...HEAD
+[2.0.0]: https://github.com/openshift-eng/cyborg-data/releases/tag/python-v2.0.0

@@ -1,13 +1,17 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27", "hatch-vcs>=0.4"]
 build-backend = "hatchling.build"
 
 [project]
 name = "orgdatacore"
-version = "2.0.0"
+# Version is derived from the git tag by hatch-vcs (see [tool.hatch.version]).
+# Release tags are prefixed `python-v` (e.g. python-v2.0.0) so they do not collide
+# with the repo's Go tags in this monorepo. See RELEASING.md.
+dynamic = ["version"]
 description = "Python library for organizational data management"
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [
     {name = "Continuous Release Tooling - Red Hat"},
@@ -15,7 +19,6 @@ authors = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -50,6 +53,22 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/openshift-eng/cyborg-data/tree/main/python"
 Repository = "https://github.com/openshift-eng/cyborg-data"
+Changelog = "https://github.com/openshift-eng/cyborg-data/blob/main/python/CHANGELOG.md"
+Issues = "https://github.com/openshift-eng/cyborg-data/issues"
+
+[tool.hatch.version]
+source = "vcs"
+
+# Monorepo: the Python package lives in python/, the Go module in go/. The git root
+# is one level up, so point setuptools-scm there with root = "..". Match only the
+# python-prefixed tags so Go tags (and the legacy v0.1.0 tag) never drive this
+# package's version. The default tag_regex strips the `python-` prefix.
+[tool.hatch.version.raw-options]
+root = ".."
+git_describe_command = ["git", "describe", "--dirty", "--tags", "--long", "--match", "python-v*"]
+# Don't hard-fail a build in a checkout without python-v* tags (e.g. a shallow CI
+# clone); real releases always build from a tag, which takes precedence.
+fallback_version = "0.0.0"
 
 [tool.hatch.build.targets.wheel]
 packages = ["orgdatacore"]
@@ -103,5 +122,3 @@ line-length = 88
 target-version = "py311"
 lint.select = ["E", "F", "I", "N", "W", "UP"]
 lint.ignore = ["E501"]
-
-

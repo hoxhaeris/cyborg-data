@@ -39,7 +39,8 @@ jobs:
           uv run --extra dev pytest
 
       # Parse the tag with PEP 440 semantics (not shell globs) to classify
-      # pre-release vs final reliably. Strips the python-v prefix first.
+      # pre-release vs final reliably. Strips the python-v prefix first, and
+      # exports the normalized version so the build can be verified against it.
       - name: Classify tag
         id: classify
         env:
@@ -57,12 +58,35 @@ jobs:
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
               out.write(f"prerelease={'true' if pkg.is_prerelease else 'false'}\n")
+              out.write(f"version={pkg}\n")
           print(f"tag={pkg} prerelease={pkg.is_prerelease}")
           PY
 
       - name: Build
         working-directory: python
         run: uv build
+
+      # Guard against a wrong (and immutable) publish: if two python-v* tags share
+      # a commit, `git describe` can pick a different tag than the one pushed, so
+      # require the built artifact to match the normalized pushed tag.
+      - name: Verify built version matches the tag
+        working-directory: python
+        env:
+          EXPECTED: ${{ steps.classify.outputs.version }}
+        run: |
+          uv run --with packaging python - <<'PY'
+          import glob, os, sys
+          from packaging.utils import parse_wheel_filename
+
+          expected = os.environ["EXPECTED"]
+          wheels = glob.glob("dist/orgdatacore-*.whl")
+          if not wheels:
+              sys.exit("::error::no wheel built in dist/")
+          built = str(parse_wheel_filename(os.path.basename(wheels[0]))[1])
+          if built != expected:
+              sys.exit(f"::error::built version {built} != pushed tag {expected}")
+          print(f"OK: built version {built} matches the tag")
+          PY
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -112,9 +136,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
@@ -124,5 +145,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${GITHUB_REF_NAME}" dist/* \
+            --repo "${GITHUB_REPOSITORY}" \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes

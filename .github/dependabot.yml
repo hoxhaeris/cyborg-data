@@ -16,11 +16,11 @@ updates:
     cooldown:
       default-days: 7
 
-  # Watch the Python package's runtime dependencies (pydantic, orgindex-schema).
-  # Dev tooling is deliberately not tracked: those updates only widen the dev upper
-  # bounds in pyproject without refreshing uv.lock, which breaks `uv lock --check`;
-  # we bump them by hand (cap + lock together) when adopting newer linting.
-  - package-ecosystem: pip
+  # Watch the Python package's dependencies. Uses the `uv` ecosystem so updates
+  # cover uv.lock alongside pyproject.toml (the `pip` ecosystem leaves uv.lock
+  # stale). Dev tooling (ruff/mypy/pytest) is bumped by hand to control linting
+  # churn, so it is ignored here.
+  - package-ecosystem: uv
     directory: "/python"
     schedule:
       interval: weekly

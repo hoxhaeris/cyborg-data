@@ -1,4 +1,4 @@
-"""Regression tests for stable-ID hierarchy traversal (OCPCRT-653).
+"""Regression tests for stable-ID hierarchy traversal.
 
 An index where a team and a team_group share the name "shared", disambiguated
 by stable IDs and linked by parent_id:

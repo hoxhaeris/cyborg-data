@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "orgdatacore"
-version = "1.0.0"
+version = "2.0.0"
 description = "Python library for organizational data management"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -25,7 +25,13 @@ classifiers = [
 ]
 keywords = ["organizational-data", "employees", "teams", "organizations"]
 
-dependencies = ["pydantic>=2.0"]
+dependencies = [
+    "pydantic>=2.0",
+    # Pre-1.0 and tightly coupled to our model shape, so cap at the next minor:
+    # a 0.2.0 may be breaking (SemVer 0.x) and the schema's additive-only gate
+    # (OCPCRT-662) isn't enforced yet. Raise deliberately when adopting 0.2.
+    "orgindex-schema>=0.1.0,<0.2.0",
+]
 
 [project.optional-dependencies]
 gcs = [

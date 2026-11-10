@@ -11,7 +11,11 @@
 # Default target
 all: test
 
-PYTHON ?= python
+# Python interpreter/runner for the python targets. Defaults to `uv run python`,
+# which syncs the project environment (including the git-sourced orgindex-schema
+# dependency) before executing. CI or environments that already provide an
+# interpreter with the deps installed can override, e.g. `make PYTHON=python3.12`.
+PYTHON ?= uv run python
 
 help:
 	@echo "Multi-Language Build System for cyborg-data"
@@ -78,10 +82,10 @@ go-bench:
 	@echo "Running Go benchmarks..."
 	cd go && $(MAKE) bench
 
-# Python targets
+# Python targets (run through $(PYTHON); see its definition above)
 python-test:
 	@echo "Running Python tests..."
-	cd python && pytest
+	cd python && $(PYTHON) -m pytest
 
 python-lint:
 	@echo "Running Python linter..."

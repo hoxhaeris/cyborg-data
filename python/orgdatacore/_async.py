@@ -29,6 +29,7 @@ from ._log import get_logger
 from ._service import (
     _ancestor_org_info_type,
     _EntityRef,
+    _group,
     _NameTypeKey,
     _normalize_slack_channel,
     _to_entity_type,
@@ -170,12 +171,15 @@ class AsyncService:
 
             self._slack_channel_index = {}
             for team in org_data.lookups.teams.values():
-                if team.group.slack is None:
+                slack = _group(team).slack
+                if slack is None:
                     continue
-                for ch in team.group.slack.channels:
+                for ch in slack.channels:
                     if ch.channel:
                         normalized = _normalize_slack_channel(ch.channel)
-                        self._slack_channel_index.setdefault(normalized, []).append(team.name)
+                        self._slack_channel_index.setdefault(normalized, []).append(
+                            team.name
+                        )
 
             self._build_derived_indexes()
 
@@ -343,7 +347,7 @@ class AsyncService:
             if self._data is None:
                 return None
             for emp in self._data.lookups.employees.values():
-                if emp.email.lower() == email.lower():
+                if (emp.email or "").lower() == email.lower():
                     return emp
             return None
 
@@ -413,7 +417,7 @@ class AsyncService:
             team = self._data.lookups.teams.get(team_name)
             if team is None:
                 return []
-            return list(team.group.escalation)
+            return list(_group(team).escalation)
 
     async def get_org_by_name(self, org_name: str) -> Org | None:
         """Get an organization by name."""
@@ -570,16 +574,36 @@ class AsyncService:
                 all_edges_identified = False
 
         for name, team in self._data.lookups.teams.items():
-            register(name, EntityType.TEAM, team.stable_id, team.parent_id, team.parent is not None)
+            register(
+                name,
+                EntityType.TEAM,
+                team.stable_id,
+                team.parent_id,
+                team.parent is not None,
+            )
         for name, org in self._data.lookups.orgs.items():
-            register(name, EntityType.ORG, org.stable_id, org.parent_id, org.parent is not None)
+            register(
+                name,
+                EntityType.ORG,
+                org.stable_id,
+                org.parent_id,
+                org.parent is not None,
+            )
         for name, pillar in self._data.lookups.pillars.items():
             register(
-                name, EntityType.PILLAR, pillar.stable_id, pillar.parent_id, pillar.parent is not None
+                name,
+                EntityType.PILLAR,
+                pillar.stable_id,
+                pillar.parent_id,
+                pillar.parent is not None,
             )
         for name, tg in self._data.lookups.team_groups.items():
             register(
-                name, EntityType.TEAM_GROUP, tg.stable_id, tg.parent_id, tg.parent is not None
+                name,
+                EntityType.TEAM_GROUP,
+                tg.stable_id,
+                tg.parent_id,
+                tg.parent is not None,
             )
 
         # Every parent_id must resolve to a known entity, otherwise traversal
@@ -1006,9 +1030,7 @@ class AsyncService:
         async with self._lock:
             if self._data is None:
                 return []
-            owners = self._data.indexes.component_ownership.component_owners.get(
-                component_name, ()
-            )
+            owners = self._data.indexes.component_ownership.get(component_name, [])
             return list(owners)
 
     async def get_components_for_team(self, team_name: str) -> list[ComponentOwnership]:
@@ -1030,11 +1052,9 @@ class AsyncService:
             if not team:
                 return []
             result: list[ComponentOwnership] = []
-            for cr in team.group.component_roles:
-                ownership_types: tuple[str, ...] = ()
-                owners = self._data.indexes.component_ownership.component_owners.get(
-                    cr, ()
-                )
+            for cr in _group(team).component_roles:
+                ownership_types: list[str] = []
+                owners = self._data.indexes.component_ownership.get(cr, [])
                 for owner in owners:
                     if owner.name == team_name:
                         ownership_types = owner.ownership_types
@@ -1042,7 +1062,7 @@ class AsyncService:
                 result.append(
                     ComponentOwnership(
                         component=cr,
-                        ownership_types=ownership_types,
+                        ownership_types=tuple(ownership_types),
                     )
                 )
             return result
@@ -1092,7 +1112,7 @@ class AsyncService:
                 return []
             return [
                 emp
-                for uid in team.group.resolved_people_uid_list
+                for uid in _group(team).resolved_people_uid_list
                 if (emp := self._data.lookups.employees.get(uid))
             ]
 
@@ -1106,7 +1126,7 @@ class AsyncService:
                 return []
             return [
                 emp
-                for uid in org.group.resolved_people_uid_list
+                for uid in _group(org).resolved_people_uid_list
                 if (emp := self._data.lookups.employees.get(uid))
             ]
 
@@ -1119,7 +1139,7 @@ class AsyncService:
         async with self._lock:
             if self._data is None:
                 return []
-            return list(self._data.indexes.jira.project_component_owners.keys())
+            return list(self._data.indexes.jira.keys())
 
     async def get_jira_components(self, project: str) -> list[str]:
         """Get all components for a Jira project.
@@ -1133,9 +1153,7 @@ class AsyncService:
         async with self._lock:
             if self._data is None:
                 return []
-            components = self._data.indexes.jira.project_component_owners.get(
-                project, {}
-            )
+            components = self._data.indexes.jira.get(project, {})
             return list(components.keys())
 
     async def get_teams_by_jira_project(self, project: str) -> list[JiraOwnerInfo]:
@@ -1150,9 +1168,7 @@ class AsyncService:
         async with self._lock:
             if self._data is None:
                 return []
-            components = self._data.indexes.jira.project_component_owners.get(
-                project, {}
-            )
+            components = self._data.indexes.jira.get(project, {})
             seen: set[str] = set()
             result: list[JiraOwnerInfo] = []
             for owners in components.values():
@@ -1177,10 +1193,8 @@ class AsyncService:
         async with self._lock:
             if self._data is None:
                 return []
-            components = self._data.indexes.jira.project_component_owners.get(
-                project, {}
-            )
-            owners = components.get(component, ())
+            components = self._data.indexes.jira.get(project, {})
+            owners = components.get(component, [])
             return list(owners)
 
     async def get_jira_ownership_for_team(self, team_name: str) -> list[dict[str, str]]:
@@ -1199,7 +1213,7 @@ class AsyncService:
             for (
                 project,
                 components,
-            ) in self._data.indexes.jira.project_component_owners.items():
+            ) in self._data.indexes.jira.items():
                 for component, owners in components.items():
                     for owner in owners:
                         if owner.name == team_name:
@@ -1207,9 +1221,7 @@ class AsyncService:
                             break
             return result
 
-    async def get_context_for_team(
-        self, team_name: str
-    ) -> list[ContextItemInfo]:
+    async def get_context_for_team(self, team_name: str) -> list[ContextItemInfo]:
         """Get resolved context items for a team (including inherited)."""
         async with self._lock:
             if self._data is None or not self._data.lookups.teams:
@@ -1217,7 +1229,7 @@ class AsyncService:
             team = self._data.lookups.teams.get(team_name)
             if team is None:
                 return []
-            return list(team.group.resolved_context)
+            return list(_group(team).resolved_context)
 
     async def get_context_for_entity(
         self, entity_name: str, entity_type: str = "team"
@@ -1229,7 +1241,7 @@ class AsyncService:
             entity = self._get_entity_by_type(entity_name, entity_type)
             if entity is None:
                 return []
-            return list(entity.group.resolved_context)
+            return list(_group(entity).resolved_context)
 
     async def get_context_by_type(
         self, entity_name: str, context_type: str, entity_type: str = "team"
@@ -1243,7 +1255,7 @@ class AsyncService:
                 return []
             return [
                 item
-                for item in entity.group.resolved_context
+                for item in _group(entity).resolved_context
                 if context_type in item.types
             ]
 
@@ -1259,7 +1271,7 @@ class AsyncService:
                 return []
             seen: set[str] = set()
             result: list[str] = []
-            for item in entity.group.resolved_context:
+            for item in _group(entity).resolved_context:
                 for t in item.types:
                     if t not in seen:
                         seen.add(t)

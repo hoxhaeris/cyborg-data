@@ -33,7 +33,7 @@ class TestGetEmployeeByUID:
                     job_title="Team Lead",
                     slack_uid="U87654321",
                     github_id="alice-codes",
-                    is_people_manager=True,
+                    manager_uid="",
                     timezone="America/Los_Angeles",
                 ),
             ),
@@ -172,10 +172,10 @@ class TestGitHubIDMapping:
 
 
 class TestNewEmployeeFields:
-    """Tests for the new employee fields added in refactoring."""
+    """Tests for the canonical employee fields."""
 
     def test_new_employee_fields(self):
-        """Test that new employee fields are properly handled."""
+        """Test that canonical employee fields are properly handled."""
         from orgdatacore import (
             Data,
             GitHubIDMappings,
@@ -196,10 +196,7 @@ class TestNewEmployeeFields:
                         job_title="Engineer",
                         slack_uid="U123",
                         github_id="testgithub",
-                        rhat_geo="NA",
-                        cost_center=12345,
                         manager_uid="manager1",
-                        is_people_manager=False,
                     ),
                 },
             ),
@@ -214,10 +211,7 @@ class TestNewEmployeeFields:
         assert emp is not None
 
         assert emp.github_id == "testgithub"
-        assert emp.rhat_geo == "NA"
-        assert emp.cost_center == 12345
         assert emp.manager_uid == "manager1"
-        assert emp.is_people_manager is False
 
 
 class TestGetManagerForEmployee:

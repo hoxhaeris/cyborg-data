@@ -3,7 +3,7 @@
 import json
 import threading
 from datetime import datetime, timedelta
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple
 
 from ._exceptions import DataLoadError
 from ._log import get_logger
@@ -11,7 +11,6 @@ from ._types import (
     Component,
     ComponentOwnerInfo,
     ComponentOwnership,
-    ComponentOwnershipIndex,
     ContextItemInfo,
     Data,
     DataSource,
@@ -19,22 +18,17 @@ from ._types import (
     Employee,
     EntityType,
     EscalationContactInfo,
-    GitHubIDMappings,
+    Group,
+    HierarchyEntity,
     HierarchyNode,
     HierarchyPathEntry,
-    Indexes,
-    JiraIndex,
     JiraOwnerInfo,
-    Lookups,
-    MembershipIndex,
     MembershipInfo,
     MembershipType,
-    Metadata,
     Org,
     OrgInfo,
     OrgInfoType,
     Pillar,
-    SlackIDMappings,
     Team,
     TeamGroup,
 )
@@ -90,109 +84,68 @@ def _ancestor_org_info_type(entity_type: EntityType) -> OrgInfoType:
             return OrgInfoType.ORGANIZATION
 
 
-def _parse_jira_index(jira_raw: dict[str, Any]) -> JiraIndex:
-    """Parse the Jira index from raw data."""
-    project_component_owners: dict[str, dict[str, tuple[JiraOwnerInfo, ...]]] = {}
+# String fields on an employee record whose JSON null is coerced to "" to match
+# Go's json.Unmarshal zero-value semantics: Go leaves a null string field as ""
+# and loads successfully, so a null uid/full_name/etc. must not raise and abort
+# the entire load on the Python side.
+_EMP_NULL_COERCED = (
+    "uid",
+    "full_name",
+    "email",
+    "job_title",
+    "github_id",
+    "manager_uid",
+    "slack_uid",
+    "timezone",
+)
 
-    for project, components in jira_raw.items():
-        if not isinstance(components, dict):
-            continue
-        project_component_owners[project] = {}
-        components_dict = cast(dict[str, Any], components)
-        for component, owners in components_dict.items():
-            if isinstance(owners, list):
-                owners_list = cast(list[dict[str, Any]], owners)
-                project_component_owners[project][component] = tuple(
-                    JiraOwnerInfo.model_validate(o) for o in owners_list
-                )
-
-    return JiraIndex(project_component_owners=project_component_owners)
+# An absent group on a hierarchy entity is modelled as None by the canonical
+# schema; queries read through this empty group so they never dereference None.
+_EMPTY_GROUP = Group()
 
 
-def _parse_component_ownership_index(raw: dict[str, Any]) -> ComponentOwnershipIndex:
-    """Parse the component ownership index from raw data."""
-    component_owners: dict[str, tuple[ComponentOwnerInfo, ...]] = {}
+def _group(entity: HierarchyEntity) -> Group:
+    """Return the entity's group, or an empty group when the entity has none."""
+    return entity.group if entity.group is not None else _EMPTY_GROUP
 
-    for component_name, owners in raw.items():
-        if isinstance(owners, list):
-            owners_list = cast(list[dict[str, Any]], owners)
-            component_owners[component_name] = tuple(
-                ComponentOwnerInfo.model_validate(o) for o in owners_list
-            )
 
-    return ComponentOwnershipIndex(component_owners=component_owners)
+def _coerce_employee_nulls(raw: Any) -> Any:
+    """Coerce an employee record's null fields to Go zero values before validation:
+    null strings to "", and a null ``possible_github_ids`` list to [] (Go marshals a
+    nil []string as JSON null, which the non-nullable canonical field would reject)."""
+    if not isinstance(raw, dict):
+        return raw
+    coerced = {**raw, **{k: (raw.get(k) or "") for k in _EMP_NULL_COERCED}}
+    if "possible_github_ids" in raw and raw["possible_github_ids"] is None:
+        coerced["possible_github_ids"] = []
+    return coerced
+
+
+def _parse_employee(raw: dict[str, Any]) -> Employee:
+    """Validate an employee record, coercing null string fields to "" to match Go
+    zero-value semantics."""
+    return Employee.model_validate(_coerce_employee_nulls(raw))
 
 
 def parse_data(raw_data: dict[str, Any]) -> Data:
-    """Parse the complete Data structure from JSON."""
-    metadata = Metadata.model_validate(raw_data.get("metadata", {}))
+    """Parse the complete Data structure from JSON against the canonical models.
 
-    lookups_raw = raw_data.get("lookups", {})
-    lookups = Lookups(
-        employees={
-            k: Employee.model_validate(v)
-            for k, v in lookups_raw.get("employees", {}).items()
-        },
-        teams={
-            k: Team.model_validate(v) for k, v in lookups_raw.get("teams", {}).items()
-        },
-        orgs={k: Org.model_validate(v) for k, v in lookups_raw.get("orgs", {}).items()},
-        pillars={
-            k: Pillar.model_validate(v)
-            for k, v in lookups_raw.get("pillars", {}).items()
-        },
-        team_groups={
-            k: TeamGroup.model_validate(v)
-            for k, v in lookups_raw.get("team_groups", {}).items()
-        },
-        components={
-            k: Component.model_validate(v)
-            for k, v in lookups_raw.get("components", {}).items()
-        },
-    )
-
-    indexes_raw = raw_data.get("indexes", {})
-    membership_raw = indexes_raw.get("membership", {})
-
-    membership_index_raw = membership_raw.get("membership_index", {})
-    membership_index = {
-        k: tuple(MembershipInfo.model_validate(m) for m in v)
-        for k, v in membership_index_raw.items()
-    }
-
-    membership = MembershipIndex(
-        membership_index=membership_index,
-    )
-
-    slack_mappings_raw = indexes_raw.get("slack_id_mappings", {})
-    slack_id_mappings = SlackIDMappings(
-        slack_uid_to_uid=slack_mappings_raw.get("slack_uid_to_uid", {}),
-    )
-
-    github_mappings_raw = indexes_raw.get("github_id_mappings", {})
-    github_id_mappings = GitHubIDMappings(
-        github_id_to_uid=github_mappings_raw.get("github_id_to_uid", {}),
-    )
-
-    jira_raw = indexes_raw.get("jira", {})
-    jira_index = _parse_jira_index(jira_raw)
-
-    component_ownership_raw = indexes_raw.get("component_ownership", {})
-    component_ownership = _parse_component_ownership_index(component_ownership_raw)
-
-    indexes = Indexes(
-        membership=membership,
-        slack_id_mappings=slack_id_mappings,
-        github_id_mappings=github_id_mappings,
-        jira=jira_index,
-        component_ownership=component_ownership,
-    )
-
-    return Data(
-        metadata=metadata,
-        lookups=lookups,
-        indexes=indexes,
-    )
+    Employee null string fields are coerced to "" before validation (Go
+    zero-value parity); everything else validates directly against the canonical
+    on-disk shape.
+    """
+    raw: dict[str, Any] = dict(raw_data)
+    lookups = raw.get("lookups")
+    if isinstance(lookups, dict):
+        employees = lookups.get("employees")
+        if isinstance(employees, dict):
+            raw["lookups"] = {
+                **lookups,
+                "employees": {
+                    k: _coerce_employee_nulls(v) for k, v in employees.items()
+                },
+            }
+    return Data.model_validate(raw)
 
 
 def _validate_data(data: Data, source: DataSource) -> None:
@@ -315,12 +268,15 @@ class Service:
 
             self._slack_channel_index = {}
             for team in org_data.lookups.teams.values():
-                if team.group.slack is None:
+                slack = _group(team).slack
+                if slack is None:
                     continue
-                for ch in team.group.slack.channels:
+                for ch in slack.channels:
                     if ch.channel:
                         normalized = _normalize_slack_channel(ch.channel)
-                        self._slack_channel_index.setdefault(normalized, []).append(team.name)
+                        self._slack_channel_index.setdefault(normalized, []).append(
+                            team.name
+                        )
 
             self._build_derived_indexes()
 
@@ -375,12 +331,28 @@ class Service:
                 all_edges_identified = False
 
         for name, team in self._data.lookups.teams.items():
-            register(name, EntityType.TEAM, team.stable_id, team.parent_id, team.parent is not None)
+            register(
+                name,
+                EntityType.TEAM,
+                team.stable_id,
+                team.parent_id,
+                team.parent is not None,
+            )
         for name, org in self._data.lookups.orgs.items():
-            register(name, EntityType.ORG, org.stable_id, org.parent_id, org.parent is not None)
+            register(
+                name,
+                EntityType.ORG,
+                org.stable_id,
+                org.parent_id,
+                org.parent is not None,
+            )
         for name, pillar in self._data.lookups.pillars.items():
             register(
-                name, EntityType.PILLAR, pillar.stable_id, pillar.parent_id, pillar.parent is not None
+                name,
+                EntityType.PILLAR,
+                pillar.stable_id,
+                pillar.parent_id,
+                pillar.parent is not None,
             )
         for name, tg in self._data.lookups.team_groups.items():
             register(
@@ -545,7 +517,7 @@ class Service:
                 return None
             email_lower = email.lower()
             for emp in self._data.lookups.employees.values():
-                if emp.email.lower() == email_lower:
+                if (emp.email or "").lower() == email_lower:
                     return emp
             return None
 
@@ -643,7 +615,7 @@ class Service:
             team = self._data.lookups.teams.get(team_name)
             if team is None:
                 return []
-            return list(team.group.escalation)
+            return list(_group(team).escalation)
 
     def get_org_by_name(self, org_name: str) -> Org | None:
         """Get an organization by name."""
@@ -699,9 +671,7 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            owners = self._data.indexes.component_ownership.component_owners.get(
-                component_name, ()
-            )
+            owners = self._data.indexes.component_ownership.get(component_name, [])
             return list(owners)
 
     def get_components_for_team(self, team_name: str) -> list[ComponentOwnership]:
@@ -723,11 +693,9 @@ class Service:
             if not team:
                 return []
             result: list[ComponentOwnership] = []
-            for cr in team.group.component_roles:
-                ownership_types: tuple[str, ...] = ()
-                owners = self._data.indexes.component_ownership.component_owners.get(
-                    cr, ()
-                )
+            for cr in _group(team).component_roles:
+                ownership_types: list[str] = []
+                owners = self._data.indexes.component_ownership.get(cr, [])
                 for owner in owners:
                     if owner.name == team_name:
                         ownership_types = owner.ownership_types
@@ -735,7 +703,7 @@ class Service:
                 result.append(
                     ComponentOwnership(
                         component=cr,
-                        ownership_types=ownership_types,
+                        ownership_types=tuple(ownership_types),
                     )
                 )
             return result
@@ -777,7 +745,7 @@ class Service:
 
             return [
                 emp
-                for uid in team.group.resolved_people_uid_list
+                for uid in _group(team).resolved_people_uid_list
                 if (emp := self._data.lookups.employees.get(uid))
             ]
 
@@ -1053,7 +1021,7 @@ class Service:
                 return []
             return [
                 emp
-                for uid in org.group.resolved_people_uid_list
+                for uid in _group(org).resolved_people_uid_list
                 if (emp := self._data.lookups.employees.get(uid))
             ]
 
@@ -1307,7 +1275,7 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            return list(self._data.indexes.jira.project_component_owners.keys())
+            return list(self._data.indexes.jira.keys())
 
     def get_jira_components(self, project: str) -> list[str]:
         """Get all components for a Jira project.
@@ -1321,9 +1289,7 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            components = self._data.indexes.jira.project_component_owners.get(
-                project, {}
-            )
+            components = self._data.indexes.jira.get(project, {})
             return list(components.keys())
 
     def get_teams_by_jira_project(self, project: str) -> list[JiraOwnerInfo]:
@@ -1338,9 +1304,7 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            components = self._data.indexes.jira.project_component_owners.get(
-                project, {}
-            )
+            components = self._data.indexes.jira.get(project, {})
             seen: set[str] = set()
             result: list[JiraOwnerInfo] = []
             for owners in components.values():
@@ -1365,10 +1329,8 @@ class Service:
         with self._lock:
             if self._data is None:
                 return []
-            components = self._data.indexes.jira.project_component_owners.get(
-                project, {}
-            )
-            owners = components.get(component, ())
+            components = self._data.indexes.jira.get(project, {})
+            owners = components.get(component, [])
             return list(owners)
 
     def get_jira_ownership_for_team(self, team_name: str) -> list[dict[str, str]]:
@@ -1387,7 +1349,7 @@ class Service:
             for (
                 project,
                 components,
-            ) in self._data.indexes.jira.project_component_owners.items():
+            ) in self._data.indexes.jira.items():
                 for component, owners in components.items():
                     for owner in owners:
                         if owner.name == team_name:
@@ -1410,7 +1372,7 @@ class Service:
             team = self._data.lookups.teams.get(team_name)
             if team is None:
                 return []
-            return list(team.group.resolved_context)
+            return list(_group(team).resolved_context)
 
     def get_context_for_entity(
         self, entity_name: str, entity_type: str = "team"
@@ -1430,7 +1392,7 @@ class Service:
             entity = self._get_entity_by_type(entity_name, entity_type)
             if entity is None:
                 return []
-            return list(entity.group.resolved_context)
+            return list(_group(entity).resolved_context)
 
     def get_context_by_type(
         self, entity_name: str, context_type: str, entity_type: str = "team"
@@ -1453,7 +1415,7 @@ class Service:
                 return []
             return [
                 item
-                for item in entity.group.resolved_context
+                for item in _group(entity).resolved_context
                 if context_type in item.types
             ]
 
@@ -1477,7 +1439,7 @@ class Service:
                 return []
             seen: set[str] = set()
             result: list[str] = []
-            for item in entity.group.resolved_context:
+            for item in _group(entity).resolved_context:
                 for t in item.types:
                     if t not in seen:
                         seen.add(t)

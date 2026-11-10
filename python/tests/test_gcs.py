@@ -14,7 +14,13 @@ from orgdatacore._internal.testing import (
 )
 from orgdatacore._types import GCSConfig
 
-_has_gcs = importlib.util.find_spec("google.cloud.storage") is not None
+try:
+    _has_gcs = importlib.util.find_spec("google.cloud.storage") is not None
+except ModuleNotFoundError:
+    # find_spec() imports parent packages and raises (rather than returning None)
+    # when the top-level `google` package is absent entirely — e.g. a default
+    # install without the optional `gcs` extra. Treat that as "GCS not installed".
+    _has_gcs = False
 
 
 @pytest.mark.skipif(not _has_gcs, reason="google-cloud-storage not installed")

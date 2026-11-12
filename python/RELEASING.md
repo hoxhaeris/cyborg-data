@@ -22,9 +22,6 @@ version (`0.1.0 → 0.2.0`) until it is frozen at `1.0.0`.** It also consumes th
 `orgindex-schema` contract; the pin in `pyproject.toml`
 (`orgindex-schema>=0.1.0,<0.2.0`) guards compatibility with that contract.
 
-> `1.0.0` and `2.0.0` were published before the package had any users and have
-> been **withdrawn**; the project restarted on `0.x`. See `CHANGELOG.md`.
-
 ## Cutting a release
 
 1. Ensure `main` is green (Prow CI on the commit you intend to release).

@@ -4,12 +4,32 @@ All notable changes to the `orgdatacore` Python package are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+While on `0.x` the public API is **not yet stable**: breaking changes bump the
+**minor** version (`0.1.0 → 0.2.0 → …`) until the API is frozen at `1.0.0`.
 
 ## [Unreleased]
 
-Nothing yet.
+### Removed
+- The runtime PII redaction/anonymization API: `RedactingDataSource`,
+  `AnonymizingDataSource`, their async variants, and the `PIIMode` enum. PII-free
+  indexes are now produced upstream and consumed directly via the `pii_free`
+  metadata flag.
 
-## [2.0.0] — unreleased
+### Migration notes
+- Consumers that wrapped a data source in `RedactingDataSource` /
+  `AnonymizingDataSource` (or their async variants) should drop the wrapper and
+  feed the library a PII-free index (`metadata.pii_free = true`) produced
+  upstream instead of redacting/anonymizing at load time.
+- Remove any `PIIMode` imports.
+
+## Prior versions (withdrawn)
+
+`1.0.0` and `2.0.0` were published before the package had any users. They have
+been **withdrawn** — `2.0.0` was removed from PyPI and the project restarted on
+the `0.x` line to signal that the API is still stabilizing. The current `0.x`
+line supersedes them; their notes are kept below for reference.
+
+## [2.0.0] — 2026-11-10 (withdrawn)
 
 Adopt the canonical [`orgindex-schema`](https://github.com/openshift-eng/orgindex-schema)
 models as the single source of truth for the on-disk index shape (OCPCRT-658).
@@ -39,10 +59,6 @@ differential test: 36,348 cases, 0 mismatches).
   emitted as `""` / `[]` rather than omitted from the JSON.
 
 ### Removed
-- The runtime PII redaction/anonymization API (`RedactingDataSource`,
-  `AnonymizingDataSource`, their async variants, and the `PIIMode` enum). PII-free
-  indexes are now produced upstream and consumed directly via the `pii_free`
-  metadata flag.
 - `Employee.rhat_geo`, `Employee.cost_center`, `Employee.is_people_manager`
   (not present in real producer output).
 - Top-level `uid`, `tab_name`, and `type` on hierarchy entities
@@ -58,10 +74,9 @@ differential test: 36,348 cases, 0 mismatches).
   `ComponentOwnershipIndex`, relies on `tuple`-typed collections, or hashes model
   instances must be updated.
 
-## [1.0.0]
+## [1.0.0] — withdrawn
 
 Initial tracked release (pre-canonical models). Hand-maintained pydantic models
 describing the on-disk index, consumed by `Service`.
 
-[Unreleased]: https://github.com/openshift-eng/cyborg-data/compare/python-v2.0.0...HEAD
-[2.0.0]: https://github.com/openshift-eng/cyborg-data/releases/tag/python-v2.0.0
+[Unreleased]: https://github.com/openshift-eng/cyborg-data/commits/main/python

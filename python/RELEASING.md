@@ -46,7 +46,11 @@ version (`0.1.0 → 0.2.0`) until it is frozen at `1.0.0`.** It also consumes th
 5. **Approve the deployment:** Actions → the release run → **Review deployments** →
    approve `pypi` (a reviewer who is not the tag author). It then publishes to
    PyPI (Trusted Publishing + attestations) and creates the GitHub Release.
-   Nothing publishes until this approval.
+   Nothing publishes until this approval. The Release notes are generated
+   automatically from the PRs merged since the previous tag, grouped by label
+   (see `.github/release.yml`) — label PRs (`kind/feature`, `kind/bug`,
+   `breaking-change`, `documentation`, `dependencies`, …) so they land in the
+   right section.
 
 ## Pre-release dry run
 

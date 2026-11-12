@@ -25,8 +25,6 @@ differential test: 36,348 cases, 0 mismatches).
   (a `0.2.0` may be breaking under SemVer).
 - `Employee.possible_github_ids` field (from the canonical schema).
 - `cohorts` lookup collection on `Lookups`.
-- PII redaction/anonymization now scrub `possible_github_ids` and also cover the
-  `cohorts` collection.
 
 ### Changed
 - On-disk index/entity models are re-exported from `orgindex-schema` under their
@@ -41,6 +39,10 @@ differential test: 36,348 cases, 0 mismatches).
   emitted as `""` / `[]` rather than omitted from the JSON.
 
 ### Removed
+- The runtime PII redaction/anonymization API (`RedactingDataSource`,
+  `AnonymizingDataSource`, their async variants, and the `PIIMode` enum). PII-free
+  indexes are now produced upstream and consumed directly via the `pii_free`
+  metadata flag.
 - `Employee.rhat_geo`, `Employee.cost_center`, `Employee.is_people_manager`
   (not present in real producer output).
 - Top-level `uid`, `tab_name`, and `type` on hierarchy entities

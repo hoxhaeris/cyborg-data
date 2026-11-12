@@ -91,14 +91,6 @@ from orgindex_schema import (
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class PIIMode(StrEnum):
-    """Controls PII visibility in organizational data."""
-
-    FULL = "full"
-    REDACTED = "redacted"
-    ANONYMIZED = "anonymized"
-
-
 class MembershipType(StrEnum):
     """Membership types for organizational hierarchy."""
 
@@ -262,7 +254,6 @@ __all__ = [
     "GCSConfig",
     "DataSource",
     # Enums.
-    "PIIMode",
     "MembershipType",
     "EntityType",
     "OrgInfoType",

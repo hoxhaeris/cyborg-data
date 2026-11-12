@@ -30,7 +30,6 @@ Example with custom DataSource:
     service.load_from_data_source(S3DataSource("my-bucket", "key"))
 """
 
-from ._anonymization import AnonymizingDataSource, AsyncAnonymizingDataSource
 from ._async import AsyncGCSDataSource, AsyncService
 from ._exceptions import (
     ConfigurationError,
@@ -41,7 +40,6 @@ from ._exceptions import (
 )
 from ._gcs import GCSDataSource
 from ._log import configure_default_logging, get_logger, set_logger
-from ._redaction import AsyncRedactingDataSource, RedactingDataSource
 from ._service import Service
 from ._types import (
     AliasInfo,
@@ -74,7 +72,6 @@ from ._types import (
     OrgInfo,
     OrgInfoType,
     ParentInfo,
-    PIIMode,
     Pillar,
     RepoInfo,
     ResourceInfo,
@@ -93,9 +90,6 @@ from ._version import (
 )
 
 __all__ = [
-    "AnonymizingDataSource",
-    "AsyncAnonymizingDataSource",
-    "AsyncRedactingDataSource",
     "Employee",
     "Team",
     "Org",
@@ -133,9 +127,7 @@ __all__ = [
     "GCSConfig",
     "MembershipType",
     "OrgInfoType",
-    "PIIMode",
     "DataSource",
-    "RedactingDataSource",
     "Service",
     "AsyncService",
     "GCSDataSource",
